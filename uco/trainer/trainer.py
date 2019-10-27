@@ -121,6 +121,7 @@ class Trainer(TrainerBase):
             Contains keys 'val_loss' and 'val_metrics'.
         """
         self.model.eval()
+        self.writer.set_step(epoch, 'valid')
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
@@ -140,19 +141,23 @@ class Trainer(TrainerBase):
                 for mtr, value in zip(metric_mtrs, self._eval_metrics(output, target)):
                     mtr.update(value, data.size(0))
 
-        self.writer.set_step(epoch, 'valid')
-        self.writer.add_image('data', make_grid(data.cpu(), nrow=8, normalize=True))
-        for c in range(4):
-            self.writer.add_image(
-                f'target{c}',
-                make_grid(target.cpu()[:, c:c + 1, :, :],
-                nrow=8, normalize=True)
-            )
-            self.writer.add_image(
-                f'output{c}',
-                make_grid(output.cpu()[:, c:c + 1, :, :],
-                nrow=8, normalize=True)
-            )
+                if batch_idx == 0:
+                    # construct an image for each class that will have the data, output, and target
+                    # on each of 3 rows in tensorboard
+                    data, target, output = data.cpu(), target.cpu(), output.cpu()
+                    data_grayscale = torch.mean(data[:4, :, :, :], dim=1, keepdim=True)
+                    for c in range(4):
+                        image = torch.cat([
+                            data_grayscale,
+                            output[:4, c:c + 1, :, :],
+                            target[:4, c:c + 1, :, :],
+                        ], dim=0)
+                        self.writer.add_image(
+                            f'class_{c}',
+                            make_grid(image,
+                            nrow=4, normalize=True)
+                        )
+
         self.writer.add_scalar('loss', losses_comb.avg)
         self.writer.add_scalar('bce', losses_bce.avg)
         self.writer.add_scalar('dice', losses_dice.avg)
