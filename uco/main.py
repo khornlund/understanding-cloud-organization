@@ -4,13 +4,11 @@ from typing import Any, List, Tuple
 from types import ModuleType
 
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
-import torch.optim as module_optimizer
-import torch.optim.lr_scheduler as module_scheduler
-from tqdm import tqdm
 
+import uco.model.optimizer as module_optimizer
+import uco.model.scheduler as module_scheduler
 import uco.data_loader.augmentation as module_aug
 import uco.data_loader.data_loaders as module_data
 import uco.model.loss as module_loss
@@ -28,7 +26,7 @@ class Runner:
     def __init__(self, config: dict):
         setup_logging(config)
         seed_everything(config['seed'])
-        self.logger = setup_logger(self, config['training']['verbose'])
+        self.logger = setup_logger(self, config['verbose'])
         self.cfg = config
 
     def train(self, resume: str) -> None:
@@ -48,7 +46,7 @@ class Runner:
         valid_data_loader = data_loader.split_validation()
 
         self.logger.info('Getting loss and metric function handles')
-        loss = getattr(module_loss, cfg['loss'])
+        loss = self.get_instance(module_loss, 'loss', cfg).to(device)
         metrics = [getattr(module_metric, met) for met in cfg['metrics']]
 
         self.logger.info('Initialising trainer')
@@ -62,6 +60,26 @@ class Runner:
 
         trainer.train()
         self.logger.info('Finished!')
+
+    def predict(self, model_checkpoint: str) -> None:
+        cfg = self.cfg.copy()
+
+        model = self.get_instance(module_arch, 'arch', cfg)
+        model, device = self.setup_device(model, cfg['target_devices'])
+        torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
+
+        model = self.load_inference(model_checkpoint, model)
+        transforms = self.get_instance(module_aug, 'augmentation', cfg)
+        data_loader = self.get_instance(module_data, 'data_loader', cfg['testing'], transforms)
+
+        self.logger.info('Initialising trainer')
+        trainer = Trainer(model, loss, metrics, optimizer,
+                          start_epoch=start_epoch,
+                          config=cfg,
+                          device=device,
+                          data_loader=data_loader,
+                          valid_data_loader=valid_data_loader,
+                          lr_scheduler=lr_scheduler)
 
         trainer.train()
         self.logger.info('Finished!')
@@ -112,21 +130,40 @@ class Runner:
         """
         Helper to remove weight decay from bias parameters.
         """
-        bias_params = []
-        weight_params = []
+        encoder_opts = config['encoder']
+        decoder_opts = config['decoder']
 
-        for name, param in model.named_parameters():
+        encoder_weight_params = []
+        encoder_bias_params = []
+        decoder_weight_params = []
+        decoder_bias_params = []
+
+        for name, param in model.encoder.named_parameters():
             if name.endswith('bias'):
-                bias_params.append(param)
+                encoder_bias_params.append(param)
             else:
-                weight_params.append(param)
+                encoder_weight_params.append(param)
 
-        self.logger.info(f'Found {len(weight_params)} weight params')
-        self.logger.info(f'Found {len(bias_params)} bias params')
+        for name, param in model.decoder.named_parameters():
+            if name.endswith('bias'):
+                decoder_bias_params.append(param)
+            else:
+                decoder_weight_params.append(param)
+
+        self.logger.info(f'Found {len(encoder_weight_params)} encoder weight params')
+        self.logger.info(f'Found {len(encoder_bias_params)} encoder bias params')
+        self.logger.info(f'Found {len(decoder_weight_params)} decoder weight params')
+        self.logger.info(f'Found {len(decoder_bias_params)} decoder bias params')
 
         params = [
-            {'params': weight_params, **config},
-            {'params': bias_params, **{k: v for k, v in config.items() if k != 'weight_decay'}},
+            {'params': encoder_weight_params, **encoder_opts},
+            {'params': decoder_weight_params, **decoder_opts},
+            {'params': encoder_bias_params,
+             'lr': encoder_opts['lr'],
+             'weight_decay': encoder_opts['weight_decay']},
+            {'params': decoder_bias_params,
+             'lr': decoder_opts['lr'],
+             'weight_decay': decoder_opts['weight_decay']},
         ]
         return params
 
@@ -150,6 +187,16 @@ class Runner:
 
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer, checkpoint['epoch']
+
+    def load_inference(self, resume_path, model):
+        """
+        Load model for inference.
+        """
+        self.logger.info(f'Loading checkpoint: {resume_path}')
+        checkpoint = torch.load(resume_path)
+        model.load_state_dict(checkpoint['state_dict'])
+        self.logger.info(f'Checkpoint "{resume_path}" loaded')
+        return model
 
     def get_instance(
         self,

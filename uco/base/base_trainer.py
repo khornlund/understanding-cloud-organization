@@ -31,7 +31,6 @@ class TrainerBase:
         with open(config_save_path, 'w') as handle:
             yaml.dump(config, handle, default_flow_style=False)
 
-
     def train(self):
         """
         Full training logic
@@ -80,8 +79,10 @@ class TrainerBase:
                     not_improved_count += 1
 
                 if not_improved_count > self.early_stop:
-                    self.logger.info(f"Validation performance didn\'t improve for {self.early_stop} "
-                                     "epochs. Training stops.")
+                    self.logger.info(
+                        f"Validation performance didn\'t improve for {self.early_stop} "
+                        "epochs. Training stops."
+                    )
                     break
 
             if epoch % self.save_period == 0:
@@ -93,7 +94,7 @@ class TrainerBase:
         """
         raise NotImplementedError
 
-    def _save_checkpoint(self, epoch: int, save_best: bool=False) -> None:
+    def _save_checkpoint(self, epoch: int, save_best: bool = False) -> None:
         """
         Saving checkpoints
 

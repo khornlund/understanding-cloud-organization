@@ -1,0 +1,33 @@
+short_name: sever
+save_dir: saved/
+seed: 1234
+target_devices: [0]
+verbose: 2
+
+arch:
+  type: FPN
+  args:
+    activation: null
+    classes: 4
+    decoder_merge_policy: cat
+    dropout: 0.1
+    encoder_name: se_resnext50_32x4d
+    encoder_weights: imagenet
+    in_channels: 3
+    weight_std: false
+
+augmentation:
+  type: LightTransforms
+  args:
+    height: 256
+    width: 416
+
+data_loader:
+  type: CloudSegDataLoader
+  args:
+    batch_size: 64
+    data_dir: data/raw/
+    nworkers: 8
+    shuffle: false
+    validation_split: 0.0
+    train: false

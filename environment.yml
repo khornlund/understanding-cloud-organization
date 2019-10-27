@@ -25,6 +25,8 @@ dependencies:
   - absl-py
   - future
   - tqdm
+  - scikit-learn
   - pip
   - pip:
+    - albumentations
     - -e .  # install package in development mode

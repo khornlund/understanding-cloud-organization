@@ -41,7 +41,7 @@ def verbose_config_name(config: dict) -> str:
     Construct a verbose name for an experiment by extracting configuration settings.
     """
     short_name = config['short_name']
-    arch = config['arch']['type']
-    loss = config['loss']
+    arch = f"{config['arch']['type']}-{config['arch']['args']['encoder_name']}"
+    loss = config['loss']['type']
     optim = config['optimizer']['type']
     return '-'.join([short_name, arch, loss, optim])
