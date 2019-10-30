@@ -25,19 +25,19 @@ class AugmentationFactoryBase(abc.ABC):
         pass
 
 
-class LightTransforms(AugmentationFactoryBase):
+class NormalizeTransforms(AugmentationFactoryBase):
 
     # training distribution stats
     MEANS = [0.2606, 0.2786, 0.3266]
     STDS  = [0.0643, 0.0621, 0.0552]
 
     def __init__(self, height, width):
-        self.H = height
-        self.W = width
+        self.height = height
+        self.width = width
 
     def build_train(self):
         return A.Compose([
-            A.RandomCrop(self.H, self.W),
+            A.RandomCrop(self.height, self.width),
             A.Normalize(self.MEANS, self.STDS),
             ToTensorV2(),
         ])
@@ -45,6 +45,94 @@ class LightTransforms(AugmentationFactoryBase):
     def build_test(self):
         return A.Compose([
             A.RandomCrop(IMAGE_ROUNDED_HEIGHT, IMAGE_ROUNDED_WIDTH),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+
+class LightRandomResizeTransforms(NormalizeTransforms):
+
+    def __init__(self, height, width):
+        super().__init__(height, width)
+
+    def build_train(self):
+        return A.Compose([
+            A.RandomResizedCrop(self.height, self.width, scale=(0.5, 0.8), ratio=(1.354, 1.554)),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+    def build_test(self):
+        return A.Compose([
+            A.Resize(self.height, self.width),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+
+class MediumResizeTransforms(NormalizeTransforms):
+
+    def __init__(self, height, width):
+        super().__init__(height, width)
+
+    def build_train(self):
+        return A.Compose([
+            A.Flip(p=0.55),
+            A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0),
+            A.Resize(self.height, self.width),
+            A.RandomBrightness(),
+            A.RandomContrast(),
+            A.OneOf([
+                A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
+                A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
+                A.CoarseDropout(max_holes=8, max_height=32, max_width=32),
+            ], p=0.5),
+            A.OneOf([
+                A.IAAPerspective(),
+                A.IAAPiecewiseAffine()
+            ]),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+    def build_test(self):
+        return A.Compose([
+            A.Resize(self.height, self.width),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+
+class HeavyResizeTransforms(NormalizeTransforms):
+
+    def __init__(self, height, width):
+        super().__init__(height, width)
+
+    def build_train(self):
+        return A.Compose([
+            A.Flip(p=0.55),
+            A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, border_mode=0),
+            A.Resize(self.height, self.width),
+            A.RandomBrightness(),
+            A.RandomContrast(),
+            A.OneOf([
+                A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
+                A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
+                A.CoarseDropout(max_holes=8, max_height=32, max_width=32),
+            ], p=0.5),
+            A.OneOf([
+                A.IAAPerspective(),
+                A.IAAPiecewiseAffine(),
+                # A.GridDistortion(),
+                # A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
+            ]),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+    def build_test(self):
+        return A.Compose([
+            A.Resize(self.height, self.width),
             A.Normalize(self.MEANS, self.STDS),
             ToTensorV2(),
         ])

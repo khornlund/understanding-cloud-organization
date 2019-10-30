@@ -9,6 +9,7 @@ dependencies:
   - numpy
   - scipy
   - matplotlib
+  - seaborn
   - pandas
   - pytest
   - flake8
@@ -17,7 +18,7 @@ dependencies:
   - click
   - jupyter
   - pyyaml
-  - pytorch>=1.1.0
+  - pytorch=1.2
   - torchvision
   - cudatoolkit=10.0
   - tensorflow
@@ -26,6 +27,7 @@ dependencies:
   - future
   - tqdm
   - scikit-learn
+  - kaggle
   - pip
   - pip:
     - albumentations

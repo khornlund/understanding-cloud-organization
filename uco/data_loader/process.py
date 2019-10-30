@@ -2,6 +2,8 @@ import numpy as np
 
 IMAGE_ORIGINAL_HEIGHT = 1400
 IMAGE_ORIGINAL_WIDTH  = 2100
+IMAGE_SUBMISSION_HEIGHT = 350
+IMAGE_SUBMISSION_WIDTH = 525
 N_CLASSES = 4
 
 
@@ -9,18 +11,18 @@ def make_mask(rle_encodings):
     shape = (IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH, N_CLASSES)
     masks = np.zeros(shape, dtype=np.float32)
     for c, label in enumerate(rle_encodings.values):
-        rle = RLE.from_str(label)
+        rle = RLEInput.from_str(label)
         masks[:, :, c] = rle.to_mask()
     return masks
 
 
-class RLE:
+class RLEBase:
     """
     Encapsulates run-length-encoding functionality.
     """
 
-    MASK_H = IMAGE_ORIGINAL_HEIGHT
-    MASK_W = IMAGE_ORIGINAL_WIDTH
+    MASK_H = 0
+    MASK_W = 0
 
     @classmethod
     def from_str(cls, s):
@@ -82,3 +84,15 @@ class RLE:
 
     def __repr__(self):
         return self.__str__()
+
+
+class RLEInput(RLEBase):
+
+    MASK_H = IMAGE_ORIGINAL_HEIGHT
+    MASK_W = IMAGE_ORIGINAL_WIDTH
+
+
+class RLEOutput(RLEBase):
+
+    MASK_H = IMAGE_SUBMISSION_HEIGHT
+    MASK_W = IMAGE_SUBMISSION_WIDTH

@@ -1,5 +1,6 @@
-from pathlib import Path
+import shutil
 import math
+from pathlib import Path
 
 import yaml
 import torch
@@ -87,6 +88,7 @@ class TrainerBase:
 
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
+        return self.checkpoint_dir
 
     def _train_epoch(self, epoch: int) -> dict:
         """
@@ -116,8 +118,8 @@ class TrainerBase:
         self.logger.info(f"Saving checkpoint: {filename} ...")
         if save_best:
             best_path = self.checkpoint_dir / 'model_best.pth'
-            torch.save(state, best_path)
             self.logger.info(f'Saving current best: {best_path}')
+            shutil.copyfile(filename, best_path)
 
     def _setup_monitoring(self, config: dict) -> None:
         """

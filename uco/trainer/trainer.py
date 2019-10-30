@@ -17,7 +17,8 @@ class Trainer(TrainerBase):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size)) * 8
+        self.log_step = int(np.sqrt(data_loader.bs)) * 8
+        self.start_val_epoch = config['training']['start_val_epoch']
 
     def _train_epoch(self, epoch: int) -> dict:
         """
@@ -29,12 +30,18 @@ class Trainer(TrainerBase):
             Dictionary containing results for the epoch.
         """
         self.model.train()
+        self.writer.set_step((epoch) * len(self.data_loader))
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            if i == 0:
+                self.writer.add_scalar('LR/encoder', param_group['lr'])
+            elif i == 1:
+                self.writer.add_scalar('LR/decoder', param_group['lr'])
 
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]
-
+        visualize_batch = np.random.choice(np.arange(len(self.data_loader) - 1))
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
 
@@ -60,17 +67,26 @@ class Trainer(TrainerBase):
                     mtr.update(value, data.size(0))
                     self.writer.add_scalar(f'batch/{mtr.name}', value)
                 self._log_batch(
-                    epoch, batch_idx, self.data_loader.batch_size,
+                    epoch, batch_idx, self.data_loader.bs,
                     len(self.data_loader), loss.item()
                 )
 
-            if batch_idx == 0:
-                self.writer.add_image('data', make_grid(data.cpu(), nrow=8, normalize=True))
+            if batch_idx == visualize_batch:
+                self.writer.set_step((epoch) * len(self.data_loader) + batch_idx)
+                # construct an image for each class that will have the data, output, and target
+                # on each of 3 rows in tensorboard
+                data, target, output = data.cpu(), target.cpu(), torch.sigmoid(output.cpu())
+                data_grayscale = torch.mean(data, dim=1, keepdim=True)
                 for c in range(4):
+                    image = torch.cat([
+                        data_grayscale,
+                        output[:, c:c + 1, :, :],
+                        target[:, c:c + 1, :, :],
+                    ], dim=0)
                     self.writer.add_image(
-                        f'target{c}',
-                        make_grid(target.cpu()[:, c:c + 1, :, :],
-                        nrow=8, normalize=True)
+                        f'class_{c}',
+                        make_grid(image,
+                        nrow=data.size(0), normalize=True, scale_each=True)
                     )
 
         del data
@@ -89,7 +105,7 @@ class Trainer(TrainerBase):
             'metrics': [mtr.avg for mtr in metric_mtrs]
         }
 
-        if self.do_validation:
+        if self.do_validation and (epoch % 2 == 0 or epoch >= self.start_val_epoch):
             val_log = self._valid_epoch(epoch)
             log = {**log, **val_log}
 
@@ -126,6 +142,7 @@ class Trainer(TrainerBase):
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]
+        visualize_batch = np.random.choice(np.arange(len(self.valid_data_loader) - 1))
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
@@ -141,21 +158,21 @@ class Trainer(TrainerBase):
                 for mtr, value in zip(metric_mtrs, self._eval_metrics(output, target)):
                     mtr.update(value, data.size(0))
 
-                if batch_idx == 0:
+                if batch_idx == visualize_batch:
                     # construct an image for each class that will have the data, output, and target
                     # on each of 3 rows in tensorboard
-                    data, target, output = data.cpu(), target.cpu(), output.cpu()
-                    data_grayscale = torch.mean(data[:4, :, :, :], dim=1, keepdim=True)
+                    data, target, output = data.cpu(), target.cpu(), torch.sigmoid(output.cpu())
+                    data_grayscale = torch.mean(data, dim=1, keepdim=True)
                     for c in range(4):
                         image = torch.cat([
                             data_grayscale,
-                            output[:4, c:c + 1, :, :],
-                            target[:4, c:c + 1, :, :],
+                            output[:, c:c + 1, :, :],
+                            target[:, c:c + 1, :, :],
                         ], dim=0)
                         self.writer.add_image(
                             f'class_{c}',
                             make_grid(image,
-                            nrow=4, normalize=True)
+                            nrow=data.size(0), normalize=True, scale_each=True)
                         )
 
         self.writer.add_scalar('loss', losses_comb.avg)

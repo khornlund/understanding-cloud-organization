@@ -95,7 +95,7 @@ class SmoothBCELoss(nn.Module):
 
     def forward(self, outputs, targets):
         return self.loss(
-            self.smoother(outputs),  # this was a mistake, but better results?
+            outputs,
             self.smoother(targets)
         )
 

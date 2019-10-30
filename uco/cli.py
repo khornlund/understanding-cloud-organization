@@ -1,7 +1,8 @@
 import click
-import yaml
 
-from uco.main import Runner
+from uco.main import EnsembleManager, Runner
+from uco.ensemble import HDF5PredictionReducer
+from uco.utils import load_config, load_train_config, kaggle_submit, setup_logging
 
 
 @click.group()
@@ -9,6 +10,31 @@ def cli():
     """
     CLI for uco
     """
+
+
+@cli.command()
+@click.option('-i', '--inference-config-filename', default='experiments/inference.yml',
+              help='Path to inference configuration')
+@click.option('-n', '--num-models', default=5, help='How many models should be in the ensemble?')
+def train_ensemble(inference_config_filename, num_models):
+    config = load_config(inference_config_filename)
+    EnsembleManager(config).start(num_models)
+
+
+@cli.command()
+@click.option('-p', '--predictions-filename', type=str,
+              default='data/predictions/raw-predictions.h5')
+@click.option('-d', '--data-directory', type=str, default='data/raw')
+def average(predictions_filename, data_directory):
+    HDF5PredictionReducer().average(predictions_filename, data_directory, 'submission.csv')
+
+
+@cli.command()
+@click.option('-f', '--filename', type=str,
+              default='data/predictions/submission.csv')
+@click.option('-n', '--name', type=str, required=True)
+def submit(filename, name):
+    kaggle_submit(filename, name)
 
 
 @cli.command()
@@ -21,27 +47,19 @@ def train(config_filename, resume):
     """
     Entry point to start training run(s).
     """
-    configs = [load_config(f) for f in config_filename]
+    configs = [load_train_config(f) for f in config_filename]
     for config in configs:
         Runner(config).train(resume)
 
 
-def load_config(filename: str) -> dict:
+@cli.command()
+@click.option('-c', '--config-filename', default='experiments/inference.yml',
+              help='Path to training configuration file.')
+@click.option('-m', '--model-checkpoint', required=True, type=str,
+              help='Model checkpoint to run inference using.')
+def predict(config_filename, model_checkpoint):
     """
-    Load a configuration file as YAML and assign the experiment a verbose name.
+    Perform inference using saved model weights, and save to HDF5 database.
     """
-    with open(filename) as fh:
-        config = yaml.safe_load(fh)
-    config['name'] = verbose_config_name(config)
-    return config
-
-
-def verbose_config_name(config: dict) -> str:
-    """
-    Construct a verbose name for an experiment by extracting configuration settings.
-    """
-    short_name = config['short_name']
-    arch = f"{config['arch']['type']}-{config['arch']['args']['encoder_name']}"
-    loss = config['loss']['type']
-    optim = config['optimizer']['type']
-    return '-'.join([short_name, arch, loss, optim])
+    config = load_config(config_filename)
+    Runner(config).predict(model_checkpoint)

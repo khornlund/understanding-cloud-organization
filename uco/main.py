@@ -1,11 +1,14 @@
 import os
 import random
+from pathlib import Path
 from typing import Any, List, Tuple
 from types import ModuleType
 
+import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 import uco.model.optimizer as module_optimizer
 import uco.model.scheduler as module_scheduler
@@ -15,7 +18,45 @@ import uco.model.loss as module_loss
 import uco.model.metric as module_metric
 import uco.model.model as module_arch
 from uco.trainer import Trainer
-from uco.utils import setup_logger, setup_logging
+from uco.utils import setup_logger, setup_logging, load_train_config
+from uco.ensemble import HDF5PredictionWriter
+
+
+class EnsembleManager:
+
+    train_config_filenames = [
+        'experiments/unet-inceptionv4-320x480.yml',
+        'experiments/fpn-inceptionv4-384x576.yml',
+        # 'experiments/fpn-b0-320x480.yml',
+        'experiments/fpn-se_resnext-320x480.yml',
+    ]
+
+    def __init__(self, config):
+        self.config = config
+        setup_logging(config)
+        self.logger = setup_logger(self, config['verbose'])
+
+    def start(self, num_models):
+        for _ in range(num_models):
+            try:
+                train_config = self.load_random_config()
+                new_seed = np.random.randint(0, 1e6)
+                self.logger.info(f'Using random seed: {new_seed}')
+                train_config['seed'] = new_seed
+
+                # perform training
+                checkpoint_dir = Runner(train_config).train(None)
+
+                # run inference using the best model
+                model_checkpoint = checkpoint_dir / 'model_best.pth'
+                Runner(self.config).predict(model_checkpoint)
+            except Exception as ex:
+                self.logger.warning(f'Caught exception: {ex}')
+
+    def load_random_config(self):
+        filename = np.random.choice(self.train_config_filenames)
+        self.logger.info(f'Selected: "{filename}"')
+        return load_train_config(filename)
 
 
 class Runner:
@@ -58,33 +99,74 @@ class Runner:
                           valid_data_loader=valid_data_loader,
                           lr_scheduler=lr_scheduler)
 
-        trainer.train()
-        self.logger.info('Finished!')
+        checkpoint_dir = trainer.train()
+        self.logger.info('Training completed.')
+        return checkpoint_dir
 
     def predict(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()
 
-        model = self.get_instance(module_arch, 'arch', cfg)
+        checkpoint = self.load_checkpoint(model_checkpoint)
+        if not self.log_score(checkpoint, cfg['output']['log']):
+            return
+        train_cfg = checkpoint['config']
+
+        model = self.get_instance(module_arch, 'arch', train_cfg)
         model, device = self.setup_device(model, cfg['target_devices'])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
-        model = self.load_inference(model_checkpoint, model)
-        transforms = self.get_instance(module_aug, 'augmentation', cfg)
-        data_loader = self.get_instance(module_data, 'data_loader', cfg['testing'], transforms)
+        transforms = self.get_instance(module_aug, 'augmentation', train_cfg)
+        data_loader = self.get_instance(module_data, 'data_loader', cfg, transforms)
 
-        self.logger.info('Initialising trainer')
-        trainer = Trainer(model, loss, metrics, optimizer,
-                          start_epoch=start_epoch,
-                          config=cfg,
-                          device=device,
-                          data_loader=data_loader,
-                          valid_data_loader=valid_data_loader,
-                          lr_scheduler=lr_scheduler)
+        timestamp = Path(model_checkpoint).parent.parent.name
+        rw = HDF5PredictionWriter(
+            filename=cfg['output']['h5'],
+            dataset=str(timestamp)
+        )
 
-        trainer.train()
-        self.logger.info('Finished!')
+        self.logger.info('Performing inference')
+        model.eval()
+        with torch.no_grad():
+            for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
+                data = data.to(device)
+                output = model(data)
+                output = torch.sigmoid(output).cpu().numpy()
+                rw.write(output)
+
+        self.logger.info(rw.close())
 
     # -- helpers ----------------------------------------------------------------------------------
+
+    def log_score(self, checkpoint, log_filename):
+        best_score = checkpoint['monitor_best'].item()
+        if best_score < 0.595:
+            self.logger.critical(f'Skipping low scoring ({best_score}) model')
+            return False
+        train_cfg = checkpoint['config']
+
+        settings = {
+            'mean_dice': best_score,
+            'encoder': train_cfg['arch']['args']['encoder_name'],
+            'decoder': train_cfg['arch']['type'],
+            'dropout': train_cfg['arch']['args']['dropout'],
+            'augs': train_cfg['augmentation']['type'],
+            'img_height': train_cfg['augmentation']['args']['height'],
+            'img_width': train_cfg['augmentation']['args']['width'],
+            'batch_size': train_cfg['data_loader']['args']['batch_size'],
+            'bce_weight': train_cfg['loss']['args']['bce_weight'],
+            'dice_weight': train_cfg['loss']['args']['dice_weight'],
+            'encoder_lr': train_cfg['optimizer']['encoder']['lr'],
+            'decoder_lr': train_cfg['optimizer']['decoder']['lr'],
+        }
+        df_new = pd.DataFrame([settings])
+
+        if Path(log_filename).exists():
+            df_existing = pd.read_csv(log_filename)
+            df = pd.concat([df_existing, df_new])
+            df.to_csv(log_filename, index=False)
+        else:
+            df_new.to_csv(log_filename, index=False)
+        return True
 
     def setup_device(
         self,
@@ -188,15 +270,15 @@ class Runner:
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer, checkpoint['epoch']
 
-    def load_inference(self, resume_path, model):
+    def load_checkpoint(self, path):
         """
-        Load model for inference.
+        Load a saved checkpoint.
         """
-        self.logger.info(f'Loading checkpoint: {resume_path}')
-        checkpoint = torch.load(resume_path)
-        model.load_state_dict(checkpoint['state_dict'])
-        self.logger.info(f'Checkpoint "{resume_path}" loaded')
-        return model
+        self.logger.info(f'Loading checkpoint: {path}')
+        checkpoint = torch.load(path)
+        self.logger.info(f'Checkpoint "{path}" loaded.')
+        self.logger.info(f'Best score: {checkpoint["monitor_best"]}')
+        return checkpoint
 
     def get_instance(
         self,

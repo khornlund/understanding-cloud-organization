@@ -1,0 +1,73 @@
+short_name: sever
+save_dir: saved/
+verbose: 2
+seed: 12145
+target_devices: [0]
+
+arch:
+  type: Unet
+  args:
+    encoder_name: inceptionv4
+    encoder_weights: imagenet
+    activation: null
+    classes: 4
+    # decoder_merge_policy: cat
+    dropout: 0.1
+    in_channels: 3
+    # weight_std: false
+
+augmentation:
+  type: HeavyResizeTransforms
+  args:
+    height: 320
+    width: 480
+
+data_loader:
+  type: CloudSegDataLoader
+  args:
+    batch_size: 16
+    data_dir: data/raw/
+    nworkers: 8
+    shuffle: true
+    validation_split: 0.2
+
+loss:
+  type: SmoothBCEDiceLoss
+  args:
+    bce_weight: 0.6
+    dice_weight: 0.4
+
+lr_scheduler:
+  type: CosineAnnealingScheduler
+  args:
+    n_epochs: 31
+    start_anneal: 1
+
+metrics:
+- dice_0
+- dice_1
+- dice_2
+- dice_3
+- dice_mean
+
+optimizer:
+  type: RAdam
+  encoder:
+    lr: 7.0e-05
+    weight_decay: 3.0e-05
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
+  args:
+    lr: 0.001
+    weight_decay: 0.0002
+
+training:
+  early_stop: 3
+  epochs: 30
+  monitor: max val_dice_mean
+  save_period: 1
+  start_val_epoch: 1
+  tensorboard: true
+  unfreeze_encoder: 0
+  verbose: 2

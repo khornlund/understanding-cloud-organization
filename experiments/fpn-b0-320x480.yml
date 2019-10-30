@@ -1,31 +1,31 @@
 short_name: sever
 save_dir: saved/
 verbose: 2
-seed: 66432
+seed: 12145
 target_devices: [0]
 
 arch:
   type: FPN
   args:
+    encoder_name: efficientnet-b0
+    encoder_weights: imagenet
     activation: null
     classes: 4
     decoder_merge_policy: cat
-    dropout: 0.1
-    encoder_name: se_resnext50_32x4d
-    encoder_weights: imagenet
+    dropout: 0.2
     in_channels: 3
     weight_std: false
 
 augmentation:
-  type: LightTransforms
+  type: HeavyResizeTransforms
   args:
-    height: 256
-    width: 416
+    height: 384
+    width: 576
 
 data_loader:
   type: CloudSegDataLoader
   args:
-    batch_size: 24
+    batch_size: 16
     data_dir: data/raw/
     nworkers: 8
     shuffle: true
@@ -40,8 +40,8 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 301
-    start_anneal: 30
+    n_epochs: 31
+    start_anneal: 1
 
 metrics:
 - dice_0
@@ -52,22 +52,22 @@ metrics:
 
 optimizer:
   type: RAdam
-  args:
-    lr: 0.001
-    weight_decay: 0.0002
+  encoder:
+    lr: 1.0e-04
+    weight_decay: 3.0e-05
   decoder:
     lr: 0.003
     weight_decay: 0.0003
-  encoder:
-    lr: 7.0e-05
-    weight_decay: 3.0e-05
+  args:
+    lr: 0.001
+    weight_decay: 0.0002
 
 training:
-  early_stop: 100
-  epochs: 300
-  monitor: min val_loss
+  early_stop: 3
+  epochs: 30
+  monitor: max val_dice_mean
   save_period: 1
-  start_val_epoch: 100
+  start_val_epoch: 1
   tensorboard: true
   unfreeze_encoder: 0
   verbose: 2
