@@ -32,8 +32,8 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
             self.dset = self.f.create_dataset(
                 self.dataset,
                 (self.N, self.C, self.H, self.W),
-                # dtype='uint8',
-                dtype='float32'
+                dtype='uint8',
+                # dtype='float32'
             )
         except Exception as _:  # noqa
             self.dset = self.f[self.dataset]
@@ -52,7 +52,6 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
         for n in range(data.shape[0]):
             for c in range(self.C):
                 resized_data[n, c, :, :] = self.resizer(image=data[n, c, :, :])['image']
-        # resized_data = np.round(resized_data * 100).astype(np.uint8)
         if (resized_data < 0).any():
             print(f'values below zero!')
         if (resized_data > 1).any():
@@ -101,12 +100,10 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
                 pred_stack = np.stack([
                     f[k][n, :, :, :] for k in f.keys()
                 ], axis=0)
-                pred_mean = pred_stack.mean(axis=0) # / 100
+                pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
                 pred_bin = (pred_mean > 0.5).astype(np.uint8)
                 for c in range(self.C):
-                    # self.logger.debug(f'Checking: {pred_bin[c, :, :].sum()}')
                     if pred_bin[c, :, :].sum() < self.min_sizes[c]:
-                        # self.logger.debug(f'throwing away {pred_bin[c, :, :].sum()} < {self.min_sizes[c]}')
                         throwaway_counter[c] += 1
                         pred_bin[c, :, :] = 0
                     rle = str(RLEOutput.from_mask(pred_bin[c, :, :]))

@@ -63,3 +63,13 @@ def predict(config_filename, model_checkpoint):
     """
     config = load_config(config_filename)
     Runner(config).predict(model_checkpoint)
+
+
+@cli.command()
+def predict_all():
+    from pathlib import Path
+    config = load_config('experiments/inference.yml')
+    checkpoints = list(Path('saved').glob('**/*model_best.pth'))
+    print(f'Performing predictions for {checkpoints}')
+    for checkpoint in checkpoints:
+        Runner(config).predict(checkpoint)

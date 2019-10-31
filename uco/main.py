@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from torchvision.utils import make_grid
 
 import uco.model.optimizer as module_optimizer
 import uco.model.scheduler as module_scheduler
@@ -18,7 +19,7 @@ import uco.model.loss as module_loss
 import uco.model.metric as module_metric
 import uco.model.model as module_arch
 from uco.trainer import Trainer
-from uco.utils import setup_logger, setup_logging, load_train_config
+from uco.utils import setup_logger, setup_logging, load_train_config, TensorboardWriter
 from uco.ensemble import HDF5PredictionWriter
 
 
@@ -113,6 +114,7 @@ class Runner:
 
         model = self.get_instance(module_arch, 'arch', train_cfg)
         model, device = self.setup_device(model, cfg['target_devices'])
+        model.load_state_dict(checkpoint['state_dict'])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
         transforms = self.get_instance(module_aug, 'augmentation', train_cfg)
@@ -123,19 +125,37 @@ class Runner:
             filename=cfg['output']['h5'],
             dataset=str(timestamp)
         )
-
+        writer_dir = Path(cfg['save_dir']) / cfg['name'] / timestamp
+        writer = TensorboardWriter(writer_dir, cfg['tensorboard'])
         self.logger.info('Performing inference')
         model.eval()
         with torch.no_grad():
             for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
                 data = data.to(device)
-                output = model(data)
-                output = torch.sigmoid(output).cpu().numpy()
+                output = torch.sigmoid(model(data))
+                if bidx % 10 == 0:
+                    self.log_predictions_tensorboard(writer, bidx, data, output)
+                output = output.cpu().numpy()
                 rw.write(output)
 
         self.logger.info(rw.close())
 
     # -- helpers ----------------------------------------------------------------------------------
+
+    def log_predictions_tensorboard(self, writer, bidx, data, output):
+        writer.set_step(bidx, 'inference')
+        data, output = data.cpu(), output.cpu()
+        data_grayscale = torch.mean(data, dim=1, keepdim=True)
+        for c in range(4):
+            image = torch.cat([
+                data_grayscale,
+                output[:, c:c + 1, :, :],
+            ], dim=0)
+            writer.add_image(
+                f'class_{c}',
+                make_grid(image,
+                nrow=data.size(0), normalize=True, scale_each=True)
+            )
 
     def log_score(self, checkpoint, log_filename):
         best_score = checkpoint['monitor_best'].item()

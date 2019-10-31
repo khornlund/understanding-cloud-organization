@@ -53,7 +53,7 @@ metrics:
 optimizer:
   type: RAdam
   encoder:
-    lr: 1.0e-04
+    lr: 7.0e-05
     weight_decay: 3.0e-05
   decoder:
     lr: 0.003
