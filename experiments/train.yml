@@ -7,25 +7,25 @@ target_devices: [0]
 arch:
   type: FPN
   args:
-    encoder_name: inceptionv4
+    encoder_name: efficientnet-b0
     encoder_weights: imagenet
     activation: null
     classes: 4
     decoder_merge_policy: cat
-    dropout: 0.2
+    dropout: 0.1
     in_channels: 3
     weight_std: false
 
 augmentation:
   type: HeavyResizeTransforms
   args:
-    height: 384
-    width: 576
+    height: 448
+    width: 672
 
 data_loader:
   type: CloudSegDataLoader
   args:
-    batch_size: 14
+    batch_size: 12
     data_dir: data/raw/
     nworkers: 8
     shuffle: true

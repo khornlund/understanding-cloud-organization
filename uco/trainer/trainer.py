@@ -19,6 +19,11 @@ class Trainer(TrainerBase):
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.bs)) * 8
         self.start_val_epoch = config['training']['start_val_epoch']
+        self.unfreeze_encoder = config['training']['unfreeze_encoder']
+
+        self.logger.info('Freezing encoder weights')
+        for p in self.model.encoder.parameters():
+            p.requires_grad = False
 
     def _train_epoch(self, epoch: int) -> dict:
         """
@@ -29,6 +34,12 @@ class Trainer(TrainerBase):
         dict
             Dictionary containing results for the epoch.
         """
+        if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
+            self.logger.info('Unfreezing encoder weights')
+            for p in self.model.encoder.parameters():
+                p.requires_grad = True
+            self.unfreeze_encoder = None
+
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
         for i, param_group in enumerate(self.optimizer.param_groups):

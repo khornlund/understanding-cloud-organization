@@ -19,45 +19,8 @@ import uco.model.loss as module_loss
 import uco.model.metric as module_metric
 import uco.model.model as module_arch
 from uco.trainer import Trainer
-from uco.utils import setup_logger, setup_logging, load_train_config, TensorboardWriter
-from uco.ensemble import HDF5PredictionWriter
-
-
-class EnsembleManager:
-
-    train_config_filenames = [
-        'experiments/unet-inceptionv4-320x480.yml',
-        'experiments/fpn-inceptionv4-384x576.yml',
-        # 'experiments/fpn-b0-320x480.yml',
-        'experiments/fpn-se_resnext-320x480.yml',
-    ]
-
-    def __init__(self, config):
-        self.config = config
-        setup_logging(config)
-        self.logger = setup_logger(self, config['verbose'])
-
-    def start(self, num_models):
-        for _ in range(num_models):
-            try:
-                train_config = self.load_random_config()
-                new_seed = np.random.randint(0, 1e6)
-                self.logger.info(f'Using random seed: {new_seed}')
-                train_config['seed'] = new_seed
-
-                # perform training
-                checkpoint_dir = Runner(train_config).train(None)
-
-                # run inference using the best model
-                model_checkpoint = checkpoint_dir / 'model_best.pth'
-                Runner(self.config).predict(model_checkpoint)
-            except Exception as ex:
-                self.logger.warning(f'Caught exception: {ex}')
-
-    def load_random_config(self):
-        filename = np.random.choice(self.train_config_filenames)
-        self.logger.info(f'Selected: "{filename}"')
-        return load_train_config(filename)
+from uco.utils import setup_logger, setup_logging, TensorboardWriter
+from uco.h5 import HDF5PredictionWriter
 
 
 class Runner:
@@ -159,9 +122,6 @@ class Runner:
 
     def log_score(self, checkpoint, log_filename):
         best_score = checkpoint['monitor_best'].item()
-        if best_score < 0.595:
-            self.logger.critical(f'Skipping low scoring ({best_score}) model')
-            return False
         train_cfg = checkpoint['config']
 
         settings = {
@@ -177,6 +137,7 @@ class Runner:
             'dice_weight': train_cfg['loss']['args']['dice_weight'],
             'encoder_lr': train_cfg['optimizer']['encoder']['lr'],
             'decoder_lr': train_cfg['optimizer']['decoder']['lr'],
+            'seed': train_cfg['seed'],
         }
         df_new = pd.DataFrame([settings])
 
@@ -186,6 +147,11 @@ class Runner:
             df.to_csv(log_filename, index=False)
         else:
             df_new.to_csv(log_filename, index=False)
+
+        if best_score < 0.60:
+            self.logger.critical(f'Skipping low scoring ({best_score}) model')
+            return False
+
         return True
 
     def setup_device(

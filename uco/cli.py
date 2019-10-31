@@ -1,8 +1,9 @@
 import click
 
-from uco.main import EnsembleManager, Runner
-from uco.ensemble import HDF5PredictionReducer
-from uco.utils import load_config, load_train_config, kaggle_submit, setup_logging
+from uco.manager import EnsembleManager
+from uco.runner import Runner
+from uco.h5 import HDF5PredictionReducer
+from uco.utils import load_config, load_train_config, kaggle_submit
 
 
 @click.group()
