@@ -22,16 +22,16 @@ data_loader:
 
 loss:
   type: SmoothBCEDiceLoss
-  args: {}
-    # bce_weight: 0.6
-    # dice_weight: 0.4
-    # smooth: 1.0e-6
+  args:
+    bce_weight: 0.6
+    dice_weight: 0.4
+    smooth: 1.0e-6
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
     n_epochs: 31
-    # start_anneal: 1
+    start_anneal: 1
 
 metrics:
 - dice_0

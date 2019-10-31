@@ -118,11 +118,15 @@ class AnnealOptions(ConfigOptionBase):
 
     @classmethod
     def options(cls):
-        return [1, 2, 3, 4, 5]
+        start_anneal = np.random.choice([1, 2, 3, 4, 5])
+        n_epochs = np.random.choice(np.arange(30, 60))
+        return [{'start_anneal': start_anneal, 'n_epochs': n_epochs}]
 
     @classmethod
     def update(cls, config):
-        config['lr_scheduler']['args']['start_anneal'] = int(cls.select())
+        option = cls.select()
+        config['lr_scheduler']['args']['start_anneal'] = int(option['start_anneal'])
+        config['lr_scheduler']['args']['n_epochs'] = int(option['n_epochs'])
         return config
 
 
@@ -132,7 +136,7 @@ class LearningRateOptions(ConfigOptionBase):
     def options(cls):
         return [
             {
-                'encoder': np.random.choice([1e-5, 3e-5, 5e-5, 7e-5, 9e-5]),
+                'encoder': np.random.choice([3e-5, 5e-5, 7e-5, 9e-5, 2e-4]),
                 'decoder': np.random.choice([1e-3, 3e-3, 5e-3]),
             }
         ]
@@ -150,6 +154,10 @@ class ModelOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
         dropout = float(np.random.choice([0.00, 0.05, 0.10, 0.15, 0.20]))
+        transforms = str(np.random.choice([
+            'HeavyResizeTransforms',
+            'HeavyResizeRandomCropTransforms',
+        ]))
         return [
             # unet - inceptionv4
             {
@@ -160,7 +168,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 48,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 192,
                         'width': 228,
@@ -175,7 +183,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 24,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -190,7 +198,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 16,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -206,7 +214,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 40,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 192,
                         'width': 228,
@@ -221,7 +229,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 20,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -237,7 +245,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 32,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -252,7 +260,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 20,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -268,7 +276,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 32,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -283,7 +291,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 16,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -299,7 +307,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 32,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -314,7 +322,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 20,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -330,7 +338,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 28,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 256,
                         'width': 384,
@@ -345,7 +353,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 16,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -361,7 +369,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 24,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 320,
                         'width': 480,
@@ -376,7 +384,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 16,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 384,
                         'width': 576,
@@ -391,7 +399,7 @@ class ModelOptions(ConfigOptionBase):
                 },
                 'batch_size': 12,
                 'augmentation': {
-                    'type': 'HeavyResizeTransforms',
+                    'type': transforms,
                     'args': {
                         'height': 448,
                         'width': 672,

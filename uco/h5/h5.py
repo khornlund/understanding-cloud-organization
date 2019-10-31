@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pandas as pd
 import h5py
@@ -38,7 +39,7 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
         except Exception as _:  # noqa
             self.dset = self.f[self.dataset]
         self.counter = 0
-        self.resizer = A.Resize(self.H, self.W, p=1)
+        self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)
 
     def write(self, data):
         rdata = self.wrangle_output(data)

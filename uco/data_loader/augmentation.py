@@ -10,6 +10,19 @@ from .process import IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH  # noqa
 IMAGE_ROUNDED_HEIGHT = 1376
 IMAGE_ROUNDED_WIDTH  = 2080
 
+VALID_IMG_SIZES = [
+    (64, 96),
+    (128, 192),
+    (192, 288),
+    (256, 384),
+    (320, 480),
+    (384, 576),
+    (448, 672),
+    (512, 768),
+    (576, 864),
+    (640, 960),
+]
+
 
 class AugmentationFactoryBase(abc.ABC):
 
@@ -118,7 +131,6 @@ class HeavyResizeTransforms(NormalizeTransforms):
             A.OneOf([
                 A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
                 A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
-                A.CoarseDropout(max_holes=8, max_height=32, max_width=32),
             ], p=0.5),
             A.OneOf([
                 A.IAAPerspective(),
@@ -135,4 +147,49 @@ class HeavyResizeTransforms(NormalizeTransforms):
             A.Resize(self.height, self.width),
             A.Normalize(self.MEANS, self.STDS),
             ToTensorV2(),
+        ])
+
+
+class ResizeRandomCropTransforms(NormalizeTransforms):
+    """
+    Resizes to the next largest valid size and then random crops at the desired size.
+    Used as a base to build other transforms.
+    """
+
+    def __init__(self, height, width):
+        self.crop_h = height
+        self.crop_w = width
+        self.resize_h = height + 64
+        self.resize_w = width + 64
+
+    def build_train(self):
+        return A.Compose([
+            A.Resize(self.resize_h, self.resize_w),
+            A.RandomCrop(self.crop_h, self.crop_w)
+        ])
+
+    def build_test(self):
+        return A.Compose([
+            A.Resize(self.resize_h, self.resize_w),
+            A.Normalize(self.MEANS, self.STDS),
+            ToTensorV2(),
+        ])
+
+
+class HeavyResizeRandomCropTransforms(ResizeRandomCropTransforms):
+
+    def build_train(self):
+        return A.Compose([
+            super().build_train(),
+            A.Flip(p=0.6),
+            A.RandomBrightness(),
+            A.RandomContrast(),
+            A.OneOf([
+                A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
+                A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
+            ], p=0.4),
+            A.OneOf([
+                A.IAAPerspective(),
+                A.IAAPiecewiseAffine(),
+            ], p=0.4),
         ])
