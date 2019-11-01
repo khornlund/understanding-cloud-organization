@@ -28,6 +28,8 @@ dependencies:
   - tqdm
   - scikit-learn
   - kaggle
+  - pre-commit
+  - black
   - pip
   - pip:
     - albumentations

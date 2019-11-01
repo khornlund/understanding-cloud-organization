@@ -54,7 +54,7 @@ optimizer:
 
 training:
   early_stop: 3
-  epochs: 30
+  epochs: 60
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1
