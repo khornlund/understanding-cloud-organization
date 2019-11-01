@@ -1,7 +1,7 @@
 import numpy as np
 
 IMAGE_ORIGINAL_HEIGHT = 1400
-IMAGE_ORIGINAL_WIDTH  = 2100
+IMAGE_ORIGINAL_WIDTH = 2100
 IMAGE_SUBMISSION_HEIGHT = 350
 IMAGE_SUBMISSION_WIDTH = 525
 N_CLASSES = 4
@@ -28,7 +28,7 @@ class RLEBase:
     def from_str(cls, s):
         if s != s:
             return cls()
-        list_ = [int(n) for n in s.split(' ')]
+        list_ = [int(n) for n in s.split(" ")]
         return cls.from_list(list_)
 
     @classmethod
@@ -68,7 +68,7 @@ class RLEBase:
             run = int(run - 1)
             end = int(run + length)
             mask[run:end] = 1
-        return mask.reshape(self.MASK_H, self.MASK_W, order='F')
+        return mask.reshape(self.MASK_H, self.MASK_W, order="F")
 
     def to_str_list(self):
         list_ = []
@@ -79,8 +79,8 @@ class RLEBase:
 
     def __str__(self):
         if len(self) == 0:
-            return ''
-        return ' '.join(self.to_str_list())
+            return ""
+        return " ".join(self.to_str_list())
 
     def __repr__(self):
         return self.__str__()

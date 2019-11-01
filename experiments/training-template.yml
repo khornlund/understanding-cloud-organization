@@ -16,7 +16,7 @@ data_loader:
   args:
     # batch_size: 16
     data_dir: data/raw/
-    nworkers: 8
+    nworkers: 12
     shuffle: true
     validation_split: 0.2
 

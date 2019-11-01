@@ -15,7 +15,6 @@ def bce_loss(output, target):
 
 
 class SoftDiceLoss(nn.Module):
-
     def __init__(self):
         super().__init__()
 
@@ -24,8 +23,8 @@ class SoftDiceLoss(nn.Module):
         num = labels.size(0)
         m1 = probs.view(num, -1)
         m2 = labels.view(num, -1)
-        intersection = (m1 * m2)
-        score = 2. * (intersection.sum(1) + 1) / (m1.sum(1) + m2.sum(1) + 1)
+        intersection = m1 * m2
+        score = 2.0 * (intersection.sum(1) + 1) / (m1.sum(1) + m2.sum(1) + 1)
         score = 1 - score.sum() / num
         return score
 
@@ -34,11 +33,7 @@ class DiceLoss(nn.Module):
     def __init__(self, eps: float = 1e-7, threshold: float = None):
         super().__init__()
 
-        self.loss_fn = partial(
-            dice,
-            eps=eps,
-            threshold=threshold,
-        )
+        self.loss_fn = partial(dice, eps=eps, threshold=threshold)
 
     def forward(self, logits, targets):
         dice = self.loss_fn(logits, targets)
@@ -47,11 +42,11 @@ class DiceLoss(nn.Module):
 
 class BCEDiceLoss(nn.Module):
     def __init__(
-            self,
-            eps: float = 1e-7,
-            threshold: float = None,
-            bce_weight: float = 0.5,
-            dice_weight: float = 0.5,
+        self,
+        eps: float = 1e-7,
+        threshold: float = None,
+        bce_weight: float = 0.5,
+        dice_weight: float = 0.5,
     ):
         super().__init__()
 
@@ -79,29 +74,20 @@ class BCEDiceLoss(nn.Module):
         bce = self.bce_loss(outputs, targets)
         dice = self.dice_loss(outputs, targets)
         loss = self.bce_weight * bce + self.dice_weight * dice
-        return {
-            'loss': loss,
-            'bce': bce,
-            'dice': dice
-        }
+        return {"loss": loss, "bce": bce, "dice": dice}
 
 
 class SmoothBCELoss(nn.Module):
-
     def __init__(self, eps=1e-8):
         super().__init__()
         self.smoother = LabelSmoother(eps)
         self.loss = nn.BCEWithLogitsLoss()
 
     def forward(self, outputs, targets):
-        return self.loss(
-            outputs,
-            self.smoother(targets)
-        )
+        return self.loss(outputs, self.smoother(targets))
 
 
 class ClasSmoothBCELoss(nn.Module):
-
     def __init__(self, eps=1e-8, pos_weight=[1, 1, 1, 1]):
         super().__init__()
         self.smoother = LabelSmoother(eps)
@@ -109,25 +95,23 @@ class ClasSmoothBCELoss(nn.Module):
         self.loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     def forward(self, outputs, targets):
-        return {'loss': self.loss(outputs, self.smoother(targets))}
+        return {"loss": self.loss(outputs, self.smoother(targets))}
 
 
 class SmoothBCEDiceLoss(BCEDiceLoss):
-
     def __init__(
-            self,
-            eps: float = 1e-7,
-            smooth: float = 1e-6,
-            threshold: float = None,
-            bce_weight: float = 0.5,
-            dice_weight: float = 0.5,
+        self,
+        eps: float = 1e-7,
+        smooth: float = 1e-6,
+        threshold: float = None,
+        bce_weight: float = 0.5,
+        dice_weight: float = 0.5,
     ):
         super().__init__(eps, threshold, bce_weight, dice_weight)
         self.bce_loss = SmoothBCELoss(smooth)
 
 
 class DeepSmoothBCEDiceLoss(nn.Module):
-
     def __init__(
         self,
         eps=1e-7,
@@ -135,7 +119,7 @@ class DeepSmoothBCEDiceLoss(nn.Module):
         threshold=None,
         bce_weight=0.5,
         dice_weight=0.5,
-        depth_weights=[1, 0.5, 0.25, 0.1]
+        depth_weights=[1, 0.5, 0.25, 0.1],
     ):
         super().__init__()
 
@@ -175,7 +159,7 @@ class DeepSmoothBCEDiceLoss(nn.Module):
                 continue
             losses.append(self.forward_single(o, targets) * weight)
             weight_total += weight
-        return {'loss': torch.stack(losses, dim=0).sum(dim=0) / weight_total}
+        return {"loss": torch.stack(losses, dim=0).sum(dim=0) / weight_total}
 
 
 class IoULoss(nn.Module):
@@ -188,11 +172,7 @@ class IoULoss(nn.Module):
             Must be one of ['none', 'Sigmoid', 'Softmax2d']
     """
 
-    def __init__(
-        self,
-        eps: float = 1e-7,
-        threshold: float = None
-    ):
+    def __init__(self, eps: float = 1e-7, threshold: float = None):
         super().__init__()
         self.metric_fn = partial(iou, eps=eps, threshold=threshold)
 
@@ -203,12 +183,12 @@ class IoULoss(nn.Module):
 
 class SmoothBCEDiceIoULoss(nn.Module):
     def __init__(
-            self,
-            eps: float = 1e-7,
-            smooth: float = 1e-6,
-            bce_weight: float = 1,
-            dice_weight: float = 1,
-            iou_weight: float = 1
+        self,
+        eps: float = 1e-7,
+        smooth: float = 1e-6,
+        bce_weight: float = 1,
+        dice_weight: float = 1,
+        iou_weight: float = 1,
     ):
         super().__init__()
         self.bce_weight = bce_weight
@@ -225,7 +205,7 @@ class SmoothBCEDiceIoULoss(nn.Module):
         iou = self.iou_loss(outputs, targets)
 
         total = self.bce_weight * bce + self.dice_weight * dice + self.iou_weight * iou
-        return {'loss': total, 'bce': bce, 'dice': dice, 'iou': iou}
+        return {"loss": total, "bce": bce, "dice": dice, "iou": iou}
 
 
 class BinaryFocalLoss(_Loss):
@@ -279,29 +259,32 @@ class BinaryFocalLoss(_Loss):
 
 
 class FocalBCEDiceLoss(BCEDiceLoss):
-
     def __init__(
-            self,
-            alpha=0.5,
-            gamma=2,
-            ignore_index=None,
-            reduction="mean",
-            reduced=False,
-            eps: float = 1e-7,
-            threshold: float = None,
-            bce_weight: float = 0.5,
-            dice_weight: float = 0.5,
+        self,
+        alpha=0.5,
+        gamma=2,
+        ignore_index=None,
+        reduction="mean",
+        reduced=False,
+        eps: float = 1e-7,
+        threshold: float = None,
+        bce_weight: float = 0.5,
+        dice_weight: float = 0.5,
     ):
         super().__init__(eps, threshold, bce_weight, dice_weight)
-        self.bce_loss = BinaryFocalLoss(alpha, gamma, ignore_index, reduction, reduced, threshold)
+        self.bce_loss = BinaryFocalLoss(
+            alpha, gamma, ignore_index, reduction, reduced, threshold
+        )
 
 
-# -- utils ----------------------------------------------------------------------------------------
+# -- utils ----------------------------------------------------------------------------
+
 
 class LabelSmoother:
     """
     Maps binary labels (0, 1) to (eps, 1 - eps)
     """
+
     def __init__(self, eps=1e-8):
         self.eps = eps
         self.scale = 1 - 2 * self.eps
@@ -316,7 +299,7 @@ def iou(
     targets: torch.Tensor,
     eps: float = 1e-7,
     threshold: float = None,
-    activation: str = "Sigmoid"
+    activation: str = "Sigmoid",
 ):
     """
     https://github.com/catalyst-team/catalyst/blob/master/catalyst/dl/utils/criterion/iou.py
@@ -346,7 +329,7 @@ def dice(
     outputs: torch.Tensor,
     targets: torch.Tensor,
     eps: float = 1e-7,
-    threshold: float = None
+    threshold: float = None,
 ):
     """
     Computes the dice metric
@@ -383,18 +366,6 @@ def focal_loss_with_logits(
     https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/losses/functional.py
     Compute binary focal loss between target and output logits.
     See :class:`~pytorch_toolbelt.losses.FocalLoss` for details.
-    Args:
-        input: Tensor of arbitrary shape
-        target: Tensor of the same shape as input
-        reduction (string, optional): Specifies the reduction to apply to the output:
-            'none' | 'mean' | 'sum' | 'batchwise_mean'. 'none': no reduction will be applied,
-            'mean': the sum of the output will be divided by the number of
-            elements in the output, 'sum': the output will be summed. Note: :attr:`size_average`
-            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
-            specifying either of those two args will override :attr:`reduction`.
-            'batchwise_mean' computes mean loss per sample in batch. Default: 'mean'
-        normalized (bool): Compute normalized focal loss (https://arxiv.org/pdf/1909.07829.pdf).
-        threshold (float, optional): Compute reduced focal loss (https://arxiv.org/abs/1903.01347).
     References::
         https://github.com/open-mmlab/mmdetection/blob/master/mmdet/core/loss/losses.py
     """

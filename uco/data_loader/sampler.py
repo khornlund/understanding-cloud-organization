@@ -17,27 +17,32 @@ class SamplerFactory:
         Parameters
         ----------
         class_idxs : 2D list of ints
-            List of sample indices for each class. Eg. [[0, 1], [2, 3]] implies indices 0, 1
-            belong to class 0, and indices 2, 3 belong to class 1.
+            List of sample indices for each class. Eg. [[0, 1], [2, 3]] implies
+            indices 0, 1 belong to class 0, and indices 2, 3 belong to class 1.
         batch_size : int
             The batch size to use.
         n_pseudo_per_batch : int
             The number of pseudo-labelled samples to include in each batch.
         """
-        self.logger.info(f'Creating `{WeightedFixedBatchSampler.__class__.__name__}`...')
+        self.logger.info(
+            f"Creating `{WeightedFixedBatchSampler.__class__.__name__}`..."
+        )
         ground_truth_per_batch = batch_size - n_pseudo_per_batch
         n_ground_truth = len(class_idxs[0])
         n_batches = n_ground_truth // ground_truth_per_batch
         class_samples_per_batch = np.array([ground_truth_per_batch, n_pseudo_per_batch])
-        self.logger.info(f'Expecting {class_samples_per_batch} samples of each class per batch, '
-                         f'over {n_batches} batches of size {batch_size}')
+        self.logger.info(
+            f"Expecting {class_samples_per_batch} samples of each class per batch, "
+            f"over {n_batches} batches of size {batch_size}"
+        )
         return WeightedFixedBatchSampler(class_samples_per_batch, class_idxs, n_batches)
 
 
 class WeightedFixedBatchSampler(BatchSampler):
     """
     Ensures each batch contains a given class distribution.
-    The lists of indices for each class are shuffled at the start of each call to `__iter__`.
+    The lists of indices for each class are shuffled at the start of each call to
+    `__iter__`.
     Parameters
     ----------
     class_samples_per_batch : `numpy.array(int)`
@@ -62,7 +67,7 @@ class WeightedFixedBatchSampler(BatchSampler):
     def _get_batch(self, start_idxs):
         selected = []
         for c, size in enumerate(self.class_samples_per_batch):
-            selected.extend(self.class_idxs[c][start_idxs[c]:start_idxs[c] + size])
+            selected.extend(self.class_idxs[c][start_idxs[c] : start_idxs[c] + size])
         np.random.shuffle(selected)
         return selected
 
@@ -81,6 +86,7 @@ class CircularList:
     """
     Applies modulo function to indexing.
     """
+
     def __init__(self, items):
         self._items = items
         self._mod = len(self._items)

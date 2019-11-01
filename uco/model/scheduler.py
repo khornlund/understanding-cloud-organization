@@ -4,7 +4,6 @@ import numpy as np
 
 
 class CustomScheduler(lr_scheduler._LRScheduler):
-
     def __init__(self, optimizer):
         self.n_params = len(optimizer.param_groups)
         super().__init__(optimizer)
@@ -19,7 +18,6 @@ class CustomScheduler(lr_scheduler._LRScheduler):
 
 
 class WarmupRolloffScheduler(CustomScheduler):
-
     def __init__(self, optimizer, start_lr, peak_lr, peak_epoch, final_lr, final_epoch):
         self._lrs = self.get_lrs(start_lr, peak_lr, peak_epoch, final_lr, final_epoch)
         super().__init__(optimizer)
@@ -40,7 +38,6 @@ class WarmupRolloffScheduler(CustomScheduler):
 
 
 class CyclicalDecayScheduler(CustomScheduler):
-
     def __init__(self, optimizer, offset, amplitude, n_periods, n_epochs, gamma):
         self._lrs = self.get_lrs(offset, amplitude, n_periods, n_epochs, gamma)
         super().__init__(optimizer)
@@ -50,10 +47,9 @@ class CyclicalDecayScheduler(CustomScheduler):
 
 
 class CosineAnnealingScheduler(lr_scheduler._LRScheduler):
-
     def __init__(self, optimizer, start_anneal, n_epochs):
         self.curve = self.get_curve(1, start_anneal, n_epochs)
-        self.initial_lrs = [param_group['lr'] for param_group in optimizer.param_groups]
+        self.initial_lrs = [param_group["lr"] for param_group in optimizer.param_groups]
         super().__init__(optimizer)
 
     def get_curve(self, start_lr, start_anneal, n_epochs):
@@ -65,7 +61,9 @@ class CosineAnnealingScheduler(lr_scheduler._LRScheduler):
         length = n_epochs - start_anneal
 
         # rolloff to zero
-        rolloff_lrs = rolloff(length, loc_factor=0.5, scale_factor=0.1, magnitude=start_lr)
+        rolloff_lrs = rolloff(
+            length, loc_factor=0.5, scale_factor=0.1, magnitude=start_lr
+        )
         lrs[start_anneal:] = rolloff_lrs
         return lrs
 
@@ -76,6 +74,7 @@ class CosineAnnealingScheduler(lr_scheduler._LRScheduler):
 
 
 # -- Util functions --
+
 
 def rolloff(length, loc_factor=0.5, scale_factor=0.1, magnitude=1, offset=0):
     """
@@ -98,7 +97,7 @@ def sin_decay(offset, amplitude, n_periods, n_epochs, gamma):
     sin = np.sin(xs)
     gammas = np.array([gamma ** x for x in range(n_epochs)])
     sin *= gammas
-    sin -= (1 - gammas)
+    sin -= 1 - gammas
     sin += 1
     sin *= amplitude / 2
     sin += offset

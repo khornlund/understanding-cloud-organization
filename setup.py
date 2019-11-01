@@ -27,14 +27,10 @@ setup(
     description="https://www.kaggle.com/c/understanding_cloud_organization/overview",
     long_description=read("README.rst"),
     packages=find_packages(exclude=("tests",)),
-    entry_points={
-        "console_scripts": [
-            "uco=uco.cli:cli"
-        ]
-    },
+    entry_points={"console_scripts": ["uco=uco.cli:cli"]},
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.6"
+        "Programming Language :: Python :: 3.6",
     ],
 )

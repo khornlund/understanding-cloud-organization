@@ -42,6 +42,10 @@ class EnsembleManager:
                 # run inference using the best model
                 model_checkpoint = checkpoint_dir / "model_best.pth"
                 Runner(self.infer_config).predict(model_checkpoint)
+
+                # delete other checkpoints
+                for f in checkpoint_dir.glob("checkpoint-epoch*.pth"):
+                    f.unlink()
             except Exception as ex:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")
@@ -102,7 +106,7 @@ class SeedOptions(ConfigOptionBase):
 class LossOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        bce_weights = [0.5, 0.6, 0.7, 0.8, 0.9]
+        bce_weights = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
         smooth_factors = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
         opts = []
         for bce_weight in bce_weights:
@@ -145,8 +149,8 @@ class LearningRateOptions(ConfigOptionBase):
     def options(cls):
         return [
             {
-                "encoder": np.random.choice([3e-5, 5e-5, 7e-5, 9e-5, 2e-4]),
-                "decoder": np.random.choice([1e-3, 3e-3, 5e-3]),
+                "encoder": np.random.choice([9e-6, 1e-5, 3e-5, 5e-5, 7e-5]),
+                "decoder": np.random.choice([9e-4, 1e-3, 3e-3]),
             }
         ]
 

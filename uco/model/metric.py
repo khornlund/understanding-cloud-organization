@@ -27,13 +27,9 @@ def dice_3(output, targets, threshold=0.5):
 
 def dice_c(c, output, targets, threshold=0.5):
     B, C, H, W = targets.size()
-    total = 0.
+    total = 0.0
     for b in range(B):
-        total += dice_single_channel(
-            output[b, c, :, :],
-            targets[b, c, :, :],
-            threshold
-        )
+        total += dice_single_channel(output[b, c, :, :], targets[b, c, :, :], threshold)
     return total / B
 
 
@@ -134,7 +130,7 @@ def _confusion(prediction, truth):
     #   0     where prediction is 0 and truth is 1 (False Negative)
 
     true_positives = torch.sum(confusion_vector == 1).item()
-    false_positives = torch.sum(confusion_vector == float('inf')).item()
+    false_positives = torch.sum(confusion_vector == float("inf")).item()
     true_negatives = torch.sum(torch.isnan(confusion_vector)).item()
     false_negatives = torch.sum(confusion_vector == 0).item()
 
