@@ -165,10 +165,15 @@ class LearningRateOptions(ConfigOptionBase):
 class ModelOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        dropout = float(np.random.choice([0.00, 0.05, 0.10, 0.15, 0.20]))
+        dropout = float(np.random.choice([0.10, 0.15, 0.20]))
         transforms = str(
             np.random.choice(
-                ["HeavyResizeTransforms", "HeavyResizeRandomCropTransforms"]
+                [
+                    "LightTransforms",
+                    "CutoutTransforms",
+                    "DistortionTransforms",
+                    "CutoutDistortionTransforms",
+                ]
             )
         )
         return [
@@ -260,7 +265,11 @@ class ModelOptions(ConfigOptionBase):
             # fpn - efficientnet-b2
             {
                 "type": "FPN",
-                "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                "args": {
+                    "encoder_name": "efficientnet-b2",
+                    "dropout": dropout,
+                    "decoder_merge_policy": "cat",
+                },
                 "batch_size": 28,
                 "augmentation": {
                     "type": transforms,
@@ -269,7 +278,11 @@ class ModelOptions(ConfigOptionBase):
             },
             {
                 "type": "FPN",
-                "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                "args": {
+                    "encoder_name": "efficientnet-b2",
+                    "dropout": dropout,
+                    "decoder_merge_policy": "cat",
+                },
                 "batch_size": 16,
                 "augmentation": {
                     "type": transforms,
@@ -279,7 +292,11 @@ class ModelOptions(ConfigOptionBase):
             # fpn - efficientnet-b0
             {
                 "type": "FPN",
-                "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                "args": {
+                    "encoder_name": "efficientnet-b0",
+                    "dropout": dropout,
+                    "decoder_merge_policy": "cat",
+                },
                 "batch_size": 24,
                 "augmentation": {
                     "type": transforms,
@@ -288,7 +305,11 @@ class ModelOptions(ConfigOptionBase):
             },
             {
                 "type": "FPN",
-                "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                "args": {
+                    "encoder_name": "efficientnet-b0",
+                    "dropout": dropout,
+                    "decoder_merge_policy": "cat",
+                },
                 "batch_size": 16,
                 "augmentation": {
                     "type": transforms,

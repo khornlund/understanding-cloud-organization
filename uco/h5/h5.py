@@ -55,13 +55,7 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
         for n in range(data.shape[0]):
             for c in range(self.C):
                 resized_data[n, c, :, :] = self.resizer(image=data[n, c, :, :])["image"]
-        if (resized_data < 0).any():
-            print(f"values below zero!")
-        if (resized_data > 1).any():
-            print(f"Values above 1!")
-        if resized_data.mean() > 0.8:
-            print("Over 0.80 average!")
-        return resized_data
+        return np.round(resized_data * 100)
 
     def close(self):
         self.f.close()
@@ -76,15 +70,9 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
     """
 
     sample_csv = "sample_submission.csv"
-    min_sizes = np.array(
-        [
-            # 2nd percentile cutoff
-            9573,
-            9670,
-            9019,
-            7885,
-        ]
-    )
+    min_sizes = np.array([9573, 9670, 9019, 7885])
+    top_thresholds = np.array([0.75, 0.75, 0.75, 0.75])
+    bot_thresholds = np.array([0.5, 0.5, 0.5, 0.5])
 
     def __init__(self, verbose=2):
         setup_logging({"save_dir": "saved", "name": "inference"})
@@ -94,17 +82,14 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
         self.logger.info(f'Reducing: "{predictions_filename}"')
         data_dir = Path(data_dir)
         sample_df = pd.read_csv(data_dir / self.sample_csv)
-        throwaway_counter = [0, 0, 0, 0]
+        throwaway_counter = np.array([0, 0, 0, 0])
         with h5py.File(predictions_filename, "r") as f:
             for n in tqdm(range(self.N), total=self.N):
                 pred_stack = np.stack([f[k][n, :, :, :] for k in f.keys()], axis=0)
                 pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
-                pred_bin = (pred_mean > 0.5).astype(np.uint8)
-                for c in range(self.C):
-                    if pred_bin[c, :, :].sum() < self.min_sizes[c]:
-                        throwaway_counter[c] += 1
-                        pred_bin[c, :, :] = 0
-                    rle = str(RLEOutput.from_mask(pred_bin[c, :, :]))
+                rles, throwaways = self.process(pred_mean)
+                throwaway_counter += throwaways
+                for c, rle in enumerate(rles):
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
         pseudo_csv = data_dir / "pseudo.csv"
         submission_csv = Path(predictions_filename).parent / reduced_filename
@@ -114,3 +99,23 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
         self.logger.info(
             f'Reduced predictions to "{pseudo_csv}" and "{submission_csv}"'
         )
+
+    def process(self, predictions):
+        """
+        Post process predictions by applying triplet-threshold.
+        """
+        throwaways = np.array([0, 0, 0, 0])
+
+        top_pass = (
+            predictions > self.top_thresholds[:, np.newaxis, np.newaxis]
+        ).astype(np.uint8)
+        for c in range(self.C):
+            if top_pass[c, :, :].sum() < self.min_sizes[c]:
+                throwaways[c] += 1
+                predictions[c, :, :] = 0
+
+        bot_pass = (
+            predictions > self.bot_thresholds[:, np.newaxis, np.newaxis]
+        ).astype(np.uint8)
+        rles = [str(RLEOutput.from_mask(bot_pass[c, :, :])) for c in range(self.C)]
+        return rles, throwaways

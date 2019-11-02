@@ -26,6 +26,9 @@ VALID_IMG_SIZES = [
 ]
 
 
+# -- Base Classes ---------------------------------------------------------------------
+
+
 class AugmentationFactoryBase(abc.ABC):
     def build(self, train):
         return self.build_train() if train else self.build_test()
@@ -39,7 +42,7 @@ class AugmentationFactoryBase(abc.ABC):
         pass
 
 
-class NormalizeTransforms(AugmentationFactoryBase):
+class NormalizeBase(AugmentationFactoryBase):
 
     # training distribution stats
     MEANS = [0.2606, 0.2786, 0.3266]
@@ -68,116 +71,7 @@ class NormalizeTransforms(AugmentationFactoryBase):
         )
 
 
-class LightRandomResizeTransforms(NormalizeTransforms):
-    def __init__(self, height, width):
-        super().__init__(height, width)
-
-    def build_train(self):
-        return A.Compose(
-            [
-                A.RandomResizedCrop(
-                    self.height, self.width, scale=(0.5, 0.8), ratio=(1.354, 1.554)
-                ),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-    def build_test(self):
-        return A.Compose(
-            [
-                A.Resize(self.height, self.width),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-
-class MediumResizeTransforms(NormalizeTransforms):
-    def __init__(self, height, width):
-        super().__init__(height, width)
-
-    def build_train(self):
-        return A.Compose(
-            [
-                A.Flip(p=0.55),
-                A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0),
-                A.Resize(self.height, self.width),
-                A.RandomBrightness(),
-                A.RandomContrast(),
-                A.OneOf(
-                    [
-                        A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
-                        A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
-                        A.CoarseDropout(max_holes=8, max_height=32, max_width=32),
-                    ],
-                    p=0.5,
-                ),
-                A.OneOf([A.IAAPerspective(), A.IAAPiecewiseAffine()]),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-    def build_test(self):
-        return A.Compose(
-            [
-                A.Resize(self.height, self.width),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-
-class HeavyResizeTransforms(NormalizeTransforms):
-    def __init__(self, height, width):
-        super().__init__(height, width)
-
-    def build_train(self):
-        return A.Compose(
-            [
-                A.Flip(p=0.55),
-                A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, border_mode=0),
-                A.Resize(self.height, self.width),
-                A.RandomBrightness(),
-                A.RandomContrast(),
-                A.OneOf(
-                    [
-                        # broken for masks
-                        A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
-                        A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
-                    ],
-                    p=0.0,
-                ),
-                A.OneOf(
-                    [
-                        A.IAAPerspective(),
-                        A.IAAPiecewiseAffine(),
-                        A.GridDistortion(),
-                        A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
-                    ],
-                    p=0.5,
-                ),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-    def build_test(self):
-        return A.Compose(
-            [
-                A.Resize(self.height, self.width),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-
-class RandomResizeCropTransforms(NormalizeTransforms):
-    """
-    Used as a base to build other transforms.
-    """
-
+class RandomResizeCropBase(NormalizeBase):
     def __init__(self, height, width, scale=(0.8, 1.0), ratio=(0.75, 1.33)):
         self.crop_h = height
         self.crop_w = width
@@ -199,7 +93,47 @@ class RandomResizeCropTransforms(NormalizeTransforms):
         )
 
 
-class HeavyResizeRandomCropTransforms(RandomResizeCropTransforms):
+def CutoutBase(height, width):
+    return A.Compose(
+        [
+            A.OneOf(
+                [
+                    DualCoarseDropout(
+                        max_holes=1,
+                        min_height=height // 4,
+                        max_height=height // 2,
+                        min_width=width // 4,
+                        max_width=width // 2,
+                        p=1,
+                    ),
+                    DualCoarseDropout(
+                        max_holes=4,
+                        min_height=height // 8,
+                        max_height=height // 4,
+                        min_width=width // 8,
+                        max_width=width // 4,
+                        p=1,
+                    ),
+                ],
+                p=0.5,
+            )
+        ]
+    )
+
+
+def DistortionBase():
+    return A.Compose(
+        [A.OneOf([A.IAAPerspective(p=1), A.ElasticTransform(p=1)], p=0.25)]
+    )
+
+
+# -- Compositions ---------------------------------------------------------------------
+
+
+class LightTransforms(RandomResizeCropBase):
+    """
+    """
+
     def build_train(self):
         return A.Compose(
             [
@@ -207,22 +141,61 @@ class HeavyResizeRandomCropTransforms(RandomResizeCropTransforms):
                 A.Flip(p=0.6),
                 A.RandomBrightness(),
                 A.RandomContrast(),
-                A.OneOf(
-                    [
-                        A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
-                        A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
-                    ],
-                    p=0.0,
-                ),
-                A.OneOf(
-                    [
-                        A.IAAPerspective(),
-                        A.IAAPiecewiseAffine(),
-                        A.GridDistortion(),
-                        A.OpticalDistortion(),
-                    ],
-                    p=0.5,
-                ),
+                A.Normalize(self.MEANS, self.STDS),
+                ToTensorV2(),
+            ]
+        )
+
+
+class CutoutTransforms(RandomResizeCropBase):
+    """
+    """
+
+    def build_train(self):
+        return A.Compose(
+            [
+                super().build_train(),
+                A.Flip(p=0.6),
+                A.RandomBrightness(),
+                A.RandomContrast(),
+                CutoutBase(self.crop_h, self.crop_w),
+                A.Normalize(self.MEANS, self.STDS),
+                ToTensorV2(),
+            ]
+        )
+
+
+class DistortionTransforms(RandomResizeCropBase):
+    """
+    """
+
+    def build_train(self):
+        return A.Compose(
+            [
+                super().build_train(),
+                A.Flip(p=0.6),
+                A.RandomBrightness(),
+                A.RandomContrast(),
+                DistortionBase(),
+                A.Normalize(self.MEANS, self.STDS),
+                ToTensorV2(),
+            ]
+        )
+
+
+class CutoutDistortionTransforms(RandomResizeCropBase):
+    """
+    """
+
+    def build_train(self):
+        return A.Compose(
+            [
+                super().build_train(),
+                A.Flip(p=0.6),
+                A.RandomBrightness(),
+                A.RandomContrast(),
+                CutoutBase(self.crop_h, self.crop_w),
+                DistortionBase(),
                 A.Normalize(self.MEANS, self.STDS),
                 ToTensorV2(),
             ]
@@ -262,11 +235,9 @@ class DualCoarseDropout(A.DualTransform):
         assert 0 < self.min_width <= self.max_width
 
     def apply(self, image, fill_value=0, holes=[], **params):
-        print(f"Applying {len(holes)} holes to img")
         return F.cutout(image, holes, fill_value)
 
     def apply_to_mask(self, image, fill_value=0, holes=[], **params):
-        print(f"Applying {len(holes)} holes to mask")
         return F.cutout(image, holes, fill_value)
 
     def get_params_dependent_on_targets(self, params):

@@ -140,11 +140,13 @@ class Runner:
         }
         df_new = pd.DataFrame([settings])
 
-        if Path(log_filename).exists():
+        log_filename = Path(log_filename)
+        if log_filename.exists():
             df_existing = pd.read_csv(log_filename)
             df = pd.concat([df_existing, df_new])
             df.to_csv(log_filename, index=False)
         else:
+            log_filename.parents.mkdir(parents=True, exist_ok=True)
             df_new.to_csv(log_filename, index=False)
 
         if best_score < 0.60:
