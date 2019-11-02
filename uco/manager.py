@@ -1,10 +1,10 @@
 import time
+from copy import deepcopy
 
 import numpy as np
 
 from uco.runner import Runner
 from uco.utils import (
-    load_train_config,
     setup_logger,
     setup_logging,
     load_config,
@@ -51,16 +51,11 @@ class EnsembleManager:
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")
                 self.logger.critical(f"Config: {train_config}")
 
-    def load_random_config(self):
-        filename = np.random.choice(self.train_config_filenames)
-        self.logger.info(f'Selected: "{filename}"')
-        return load_train_config(filename)
-
 
 class ConfigurationRandomiser:
     @property
     def base(self):
-        return self._base.copy()
+        return deepcopy(self._base)
 
     def __init__(self, base_config):
         self._base = load_config(base_config)

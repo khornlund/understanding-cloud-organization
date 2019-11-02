@@ -46,8 +46,12 @@ class Runner:
         model, optimizer, start_epoch = self.resume_checkpoint(
             resume, model, optimizer, cfg
         )
+        try:
+            transforms = self.get_instance(module_aug, "augmentation", cfg)
+        except:
+            cfg["augmentation"]["type"] = "LightTransforms"
+            transforms = self.get_instance(module_aug, "augmentation", cfg)
 
-        transforms = self.get_instance(module_aug, "augmentation", cfg)
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
         valid_data_loader = data_loader.split_validation()
 
@@ -134,6 +138,7 @@ class Runner:
             "batch_size": train_cfg["data_loader"]["args"]["batch_size"],
             "bce_weight": train_cfg["loss"]["args"]["bce_weight"],
             "dice_weight": train_cfg["loss"]["args"]["dice_weight"],
+            "smooth": train_cfg["loss"]["args"]["smooth"],
             "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
             "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
             "seed": train_cfg["seed"],
@@ -143,6 +148,8 @@ class Runner:
         log_filename = Path(log_filename)
         if log_filename.exists():
             df_existing = pd.read_csv(log_filename)
+            for new_col in [c for c in df_new.columns if c not in df_existing.columns]:
+                df_existing[new_col] = ""
             df = pd.concat([df_existing, df_new])
             df.to_csv(log_filename, index=False)
         else:

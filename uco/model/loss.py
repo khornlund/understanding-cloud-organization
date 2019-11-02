@@ -111,6 +111,24 @@ class SmoothBCEDiceLoss(BCEDiceLoss):
         self.bce_loss = SmoothBCELoss(smooth)
 
 
+class SlidingSmoothBCEDiceLoss(SmoothBCEDiceLoss):
+    def __init__(
+        self,
+        dice_step: float = 0.01,
+        eps: float = 1e-7,
+        smooth: float = 1e-6,
+        threshold: float = None,
+        bce_weight: float = 0.5,
+        dice_weight: float = 0.5,
+    ):
+        self.dice_step = dice_step
+        super().__init(eps, smooth, threshold, bce_weight, dice_weight)
+
+    def step(self):
+        self.dice_weight += self.dice_step
+        self.bce_weight = 1 - self.dice_weight
+
+
 class DeepSmoothBCEDiceLoss(nn.Module):
     def __init__(
         self,

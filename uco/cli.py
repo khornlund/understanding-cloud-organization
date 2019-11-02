@@ -103,7 +103,7 @@ def predict_all():
     from pathlib import Path
 
     config = load_config("experiments/inference.yml")
-    checkpoints = list(Path("saved").glob("**/*model_best.pth"))
+    checkpoints = list(Path("saved/scp").glob("**/*model_best.pth"))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
         Runner(config).predict(checkpoint)

@@ -71,7 +71,7 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
     min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.75, 0.75, 0.75, 0.75])
+    top_thresholds = np.array([0.7, 0.7, 0.7, 0.7])
     bot_thresholds = np.array([0.5, 0.5, 0.5, 0.5])
 
     def __init__(self, verbose=2):
