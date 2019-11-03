@@ -128,7 +128,7 @@ class AnnealOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
         start_anneal = 1
-        n_epochs = np.random.choice(np.arange(30, 60))
+        n_epochs = np.random.choice(np.arange(35, 45))
         return [{"start_anneal": start_anneal, "n_epochs": n_epochs}]
 
     @classmethod
