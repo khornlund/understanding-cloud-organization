@@ -127,7 +127,7 @@ class LossOptions(ConfigOptionBase):
 class AnnealOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        start_anneal = np.random.choice([1, 2, 3, 4, 5])
+        start_anneal = 1
         n_epochs = np.random.choice(np.arange(30, 60))
         return [{"start_anneal": start_anneal, "n_epochs": n_epochs}]
 
@@ -144,7 +144,7 @@ class LearningRateOptions(ConfigOptionBase):
     def options(cls):
         return [
             {
-                "encoder": np.random.choice([1e-5, 3e-5, 5e-5, 7e-5]),
+                "encoder": np.random.choice([3e-5, 5e-5, 7e-5]),
                 "decoder": np.random.choice([1e-3, 2e-3, 3e-3]),
             }
         ]
@@ -164,10 +164,10 @@ class ModelOptions(ConfigOptionBase):
         transforms = str(
             np.random.choice(
                 [
-                    "LightTransforms",
+                    # "LightTransforms",
                     "CutoutTransforms",
                     "DistortionTransforms",
-                    "CutoutDistortionTransforms",
+                    # "CutoutDistortionTransforms",
                 ]
             )
         )

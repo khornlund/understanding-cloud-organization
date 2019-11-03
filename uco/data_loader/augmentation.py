@@ -138,7 +138,7 @@ def CutoutBase(height, width):
                         p=1,
                     ),
                 ],
-                p=0.5,
+                p=0.2,
             )
         ]
     )
@@ -181,7 +181,7 @@ class CutoutTransforms(RandomResizeCropBase):
                 A.Flip(p=0.6),
                 A.RandomBrightness(),
                 A.RandomContrast(),
-                CutoutBase(self.crop_h, self.crop_w),
+                CutoutBase(self.h, self.w),
                 A.Normalize(self.MEANS, self.STDS),
                 ToTensorV2(),
             ]
@@ -217,7 +217,7 @@ class CutoutDistortionTransforms(RandomResizeCropBase):
                 A.Flip(p=0.6),
                 A.RandomBrightness(),
                 A.RandomContrast(),
-                CutoutBase(self.crop_h, self.crop_w),
+                CutoutBase(self.h, self.w),
                 DistortionBase(),
                 A.Normalize(self.MEANS, self.STDS),
                 ToTensorV2(),
