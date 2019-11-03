@@ -16,7 +16,7 @@ data_loader:
   args:
     # batch_size: 16
     data_dir: data/raw/
-    nworkers: 12
+    nworkers: 8
     shuffle: true
     validation_split: 0.2
 
@@ -30,7 +30,7 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 31
+    n_epochs: 36
     start_anneal: 1
 
 metrics:
@@ -53,8 +53,8 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  early_stop: 3
-  epochs: 60
+  early_stop: 4
+  epochs: 35
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1
