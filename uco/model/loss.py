@@ -371,6 +371,38 @@ def dice(
     return dice
 
 
+def dice_classwise(
+    outputs: torch.Tensor,
+    targets: torch.Tensor,
+    eps: float = 1e-7,
+    threshold: float = None,
+):
+    """
+    Computes the dice metric for each class, and averages them together
+    Args:
+        outputs (list):  A list of predicted elements
+        targets (list): A list of elements that are to be predicted
+        eps (float): epsilon
+        threshold (float): threshold for outputs binarization
+    Returns:
+        double:  Dice score
+    """
+    outputs = torch.sigmoid(outputs)
+
+    if threshold is not None:
+        outputs = (outputs > threshold).float()
+
+    B, C, H, W = outputs.size()
+    for i, c in enumerate(range(C)):
+        intersection = torch.sum(targets[:, c, :, :] * outputs[:, c, :, :])
+        union = torch.sum(targets[:, c, :, :]) + torch.sum(outputs[:, c, :, :])
+        if i == 0:
+            dice = 2 * intersection / (union + eps)
+        else:
+            dice += 2 * intersection / (union + eps)
+    return dice / C
+
+
 def focal_loss_with_logits(
     input: torch.Tensor,
     target: torch.Tensor,

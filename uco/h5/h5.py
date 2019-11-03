@@ -71,7 +71,7 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
     min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.7, 0.7, 0.7, 0.7])
+    top_thresholds = np.array([0.65, 0.65, 0.65, 0.65])
     bot_thresholds = np.array([0.5, 0.5, 0.5, 0.5])
 
     def __init__(self, verbose=2):
@@ -119,3 +119,29 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
         ).astype(np.uint8)
         rles = [str(RLEOutput.from_mask(bot_pass[c, :, :])) for c in range(self.C)]
         return rles, throwaways
+
+
+def draw_convex_hull(mask, mode="convex"):
+    """
+    https://www.kaggle.com/ratthachat/cloud-convexhull-polygon-postprocessing-no-gpu
+    """
+    img = np.zeros(mask.shape)
+    contours, hier = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for c in contours:
+        if mode == "rect":  # simple rectangle
+            x, y, w, h = cv2.boundingRect(c)
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), -1)
+        elif mode == "convex":  # minimum convex hull
+            hull = cv2.convexHull(c)
+            cv2.drawContours(img, [hull], 0, (255, 255, 255), -1)
+        elif mode == "approx":
+            epsilon = 0.02 * cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, epsilon, True)
+            cv2.drawContours(img, [approx], 0, (255, 255, 255), -1)
+        else:  # minimum area rectangle
+            rect = cv2.minAreaRect(c)
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            cv2.drawContours(img, [box], 0, (255, 255, 255), -1)
+    return img / 255.0

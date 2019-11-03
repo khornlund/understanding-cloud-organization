@@ -72,24 +72,47 @@ class NormalizeBase(AugmentationFactoryBase):
 
 
 class RandomResizeCropBase(NormalizeBase):
-    def __init__(self, height, width, scale=(0.8, 1.0), ratio=(0.75, 1.33)):
-        self.crop_h = height
-        self.crop_w = width
-        self.scale = scale
+    def __init__(
+        self,
+        height,
+        width,
+        scale_rrc=(0.7, 1),
+        ratio=(0.75, 1.33),
+        scale_ssr=0.3,
+        rotate=10,
+    ):
+        self.h = height
+        self.w = width
+        self.scale_rrc = scale_rrc
         self.ratio = ratio
+        self.scale_ssr = scale_ssr
+        self.rotate = rotate
 
     def build_train(self):
         return A.Compose(
-            [A.RandomResizedCrop(self.crop_h, self.crop_w, self.scale, self.ratio)]
+            [
+                A.OneOf(
+                    [
+                        A.RandomResizedCrop(self.h, self.w, self.scale_rrc, self.ratio),
+                        A.Compose(
+                            [
+                                A.Resize(self.h, self.w),
+                                A.ShiftScaleRotate(
+                                    scale_limit=self.scale_ssr,
+                                    rotate_limit=self.rotate,
+                                    border_mode=0,
+                                ),
+                            ]
+                        ),
+                    ],
+                    p=1,
+                )
+            ]
         )
 
     def build_test(self):
         return A.Compose(
-            [
-                A.Resize(self.crop_h, self.crop_w),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
+            [A.Resize(self.h, self.w), A.Normalize(self.MEANS, self.STDS), ToTensorV2()]
         )
 
 
@@ -284,14 +307,6 @@ class HeavyResizeTransforms(NormalizeBase):
                 A.Resize(self.height, self.width),
                 A.RandomBrightness(),
                 A.RandomContrast(),
-                A.OneOf(
-                    [
-                        # broken for masks
-                        A.CoarseDropout(max_holes=2, max_height=128, max_width=128),
-                        A.CoarseDropout(max_holes=4, max_height=64, max_width=64),
-                    ],
-                    p=0.0,
-                ),
                 A.OneOf(
                     [
                         A.IAAPerspective(),
