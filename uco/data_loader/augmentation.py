@@ -225,6 +225,42 @@ class CutoutDistortionTransforms(RandomResizeCropBase):
         )
 
 
+class HeavyResizeTransforms(NormalizeBase):
+    def __init__(self, height, width):
+        super().__init__(height, width)
+
+    def build_train(self):
+        return A.Compose(
+            [
+                A.Flip(p=0.55),
+                A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, border_mode=0),
+                A.Resize(self.height, self.width),
+                A.RandomBrightness(),
+                A.RandomContrast(),
+                A.OneOf(
+                    [
+                        A.IAAPerspective(),
+                        A.IAAPiecewiseAffine(),
+                        A.GridDistortion(),
+                        A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
+                    ],
+                    p=0.5,
+                ),
+                A.Normalize(self.MEANS, self.STDS),
+                ToTensorV2(),
+            ]
+        )
+
+    def build_test(self):
+        return A.Compose(
+            [
+                A.Resize(self.height, self.width),
+                A.Normalize(self.MEANS, self.STDS),
+                ToTensorV2(),
+            ]
+        )
+
+
 # -- custom augmentations -------------------------------------------------------------
 
 
@@ -292,40 +328,4 @@ class DualCoarseDropout(A.DualTransform):
             "min_holes",
             "min_height",
             "min_width",
-        )
-
-
-class HeavyResizeTransforms(NormalizeBase):
-    def __init__(self, height, width):
-        super().__init__(height, width)
-
-    def build_train(self):
-        return A.Compose(
-            [
-                A.Flip(p=0.55),
-                A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, border_mode=0),
-                A.Resize(self.height, self.width),
-                A.RandomBrightness(),
-                A.RandomContrast(),
-                A.OneOf(
-                    [
-                        A.IAAPerspective(),
-                        A.IAAPiecewiseAffine(),
-                        A.GridDistortion(),
-                        A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
-                    ],
-                    p=0.5,
-                ),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
-        )
-
-    def build_test(self):
-        return A.Compose(
-            [
-                A.Resize(self.height, self.width),
-                A.Normalize(self.MEANS, self.STDS),
-                ToTensorV2(),
-            ]
         )

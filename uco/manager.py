@@ -101,18 +101,18 @@ class SeedOptions(ConfigOptionBase):
 class LossOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        bce_weights = [0.5, 0.6, 0.7, 0.8]
+        bce_weights = [0.6, 0.7, 0.8]
         smooth_factors = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
         opts = []
         for bce_weight in bce_weights:
             for smooth_factor in smooth_factors:
                 opts.append(
                     {
-                        "type": "SmoothBCEDiceLoss",
+                        "type": "BCEDiceLoss",
                         "args": {
                             "bce_weight": bce_weight,
                             "dice_weight": 1 - bce_weight,
-                            "smooth": smooth_factor,
+                            # "smooth": smooth_factor,
                         },
                     }
                 )
@@ -168,6 +168,7 @@ class ModelOptions(ConfigOptionBase):
                     "CutoutTransforms",
                     "DistortionTransforms",
                     # "CutoutDistortionTransforms",
+                    "HeavyResizeTransforms",
                 ]
             )
         )
@@ -242,7 +243,7 @@ class ModelOptions(ConfigOptionBase):
             {
                 "type": "Unet",
                 "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                "batch_size": 32,
+                "batch_size": 28,
                 "augmentation": {
                     "type": transforms,
                     "args": {"height": 256, "width": 384},

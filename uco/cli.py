@@ -1,4 +1,5 @@
 import click
+from pathlib import Path
 
 from uco.manager import EnsembleManager
 from uco.runner import Runner
@@ -100,10 +101,8 @@ def predict(config_filename, model_checkpoint):
 
 @cli.command()
 def predict_all():
-    from pathlib import Path
-
     config = load_config("experiments/inference.yml")
-    checkpoints = list(Path("saved/scp").glob("**/*model_best.pth"))
+    checkpoints = list(Path("saved").glob("sever*/**/*model_best.pth"))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
         Runner(config).predict(checkpoint)

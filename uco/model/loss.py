@@ -14,26 +14,10 @@ def bce_loss(output, target):
     return F.binary_cross_entropy_with_logits(output, target)
 
 
-class SoftDiceLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, logits, labels):
-        probs = torch.sigmoid(logits)
-        num = labels.size(0)
-        m1 = probs.view(num, -1)
-        m2 = labels.view(num, -1)
-        intersection = m1 * m2
-        score = 2.0 * (intersection.sum(1) + 1) / (m1.sum(1) + m2.sum(1) + 1)
-        score = 1 - score.sum() / num
-        return score
-
-
 class DiceLoss(nn.Module):
-    def __init__(self, eps: float = 1e-7, threshold: float = None):
+    def __init__(self, eps: float = 1e-7, threshold: float = None, soften: float = 0):
         super().__init__()
-
-        self.loss_fn = partial(dice, eps=eps, threshold=threshold)
+        self.loss_fn = partial(dice, eps=eps, threshold=threshold, soften=soften)
 
     def forward(self, logits, targets):
         dice = self.loss_fn(logits, targets)
@@ -47,6 +31,7 @@ class BCEDiceLoss(nn.Module):
         threshold: float = None,
         bce_weight: float = 0.5,
         dice_weight: float = 0.5,
+        soften: float = 0,
     ):
         super().__init__()
 
@@ -63,7 +48,7 @@ class BCEDiceLoss(nn.Module):
             self.bce_loss = nn.BCEWithLogitsLoss()
 
         if self.dice_weight != 0:
-            self.dice_loss = DiceLoss(eps=eps, threshold=threshold)
+            self.dice_loss = DiceLoss(eps=eps, threshold=threshold, soften=soften)
 
     def forward(self, outputs, targets):
         if self.bce_weight == 0:
@@ -77,107 +62,21 @@ class BCEDiceLoss(nn.Module):
         return {"loss": loss, "bce": bce, "dice": dice}
 
 
-class SmoothBCELoss(nn.Module):
-    def __init__(self, eps=1e-8):
-        super().__init__()
-        self.smoother = LabelSmoother(eps)
-        self.loss = nn.BCEWithLogitsLoss()
-
-    def forward(self, outputs, targets):
-        return self.loss(outputs, self.smoother(targets))
-
-
-class ClasSmoothBCELoss(nn.Module):
-    def __init__(self, eps=1e-8, pos_weight=[1, 1, 1, 1]):
-        super().__init__()
-        self.smoother = LabelSmoother(eps)
-        pos_weight = torch.tensor(pos_weight)
-        self.loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-
-    def forward(self, outputs, targets):
-        return {"loss": self.loss(outputs, self.smoother(targets))}
-
-
-class SmoothBCEDiceLoss(BCEDiceLoss):
-    def __init__(
-        self,
-        eps: float = 1e-7,
-        smooth: float = 1e-6,
-        threshold: float = None,
-        bce_weight: float = 0.5,
-        dice_weight: float = 0.5,
-    ):
-        super().__init__(eps, threshold, bce_weight, dice_weight)
-        self.bce_loss = SmoothBCELoss(smooth)
-
-
-class SlidingSmoothBCEDiceLoss(SmoothBCEDiceLoss):
+class SlidingBCEDiceLoss(BCEDiceLoss):
     def __init__(
         self,
         dice_step: float = 0.01,
         eps: float = 1e-7,
-        smooth: float = 1e-6,
         threshold: float = None,
         bce_weight: float = 0.5,
         dice_weight: float = 0.5,
     ):
         self.dice_step = dice_step
-        super().__init(eps, smooth, threshold, bce_weight, dice_weight)
+        super().__init(eps, threshold, bce_weight, dice_weight)
 
     def step(self):
         self.dice_weight += self.dice_step
         self.bce_weight = 1 - self.dice_weight
-
-
-class DeepSmoothBCEDiceLoss(nn.Module):
-    def __init__(
-        self,
-        eps=1e-7,
-        smooth=1e-6,
-        threshold=None,
-        bce_weight=0.5,
-        dice_weight=0.5,
-        depth_weights=[1, 0.5, 0.25, 0.1],
-    ):
-        super().__init__()
-
-        if bce_weight == 0 and dice_weight == 0:
-            raise ValueError(
-                "Both bce_wight and dice_weight cannot be "
-                "equal to 0 at the same time."
-            )
-
-        self.bce_weight = bce_weight
-        self.dice_weight = dice_weight
-        self.depth_weights = depth_weights
-
-        if self.bce_weight != 0:
-            self.bce_loss = SmoothBCELoss(smooth)
-        if self.dice_weight != 0:
-            self.dice_loss = DiceLoss(eps=eps, threshold=threshold)
-
-    def forward_single(self, outputs, targets):
-        if self.bce_weight == 0:
-            return self.dice_weight * self.dice_loss(outputs, targets)
-        if self.dice_weight == 0:
-            return self.bce_weight * self.bce_loss(outputs, targets)
-
-        bce = self.bce_loss(outputs, targets)
-        dice = self.dice_loss(outputs, targets)
-        loss = self.bce_weight * bce + self.dice_weight * dice
-        return loss
-
-    def forward(self, outputs, targets):
-        assert len(outputs) == len(self.depth_weights)
-        losses = []
-        weight_total = 0
-        for idx, o in enumerate(outputs):
-            weight = self.depth_weights[idx]
-            if weight == 0:
-                continue
-            losses.append(self.forward_single(o, targets) * weight)
-            weight_total += weight
-        return {"loss": torch.stack(losses, dim=0).sum(dim=0) / weight_total}
 
 
 class IoULoss(nn.Module):
@@ -197,33 +96,6 @@ class IoULoss(nn.Module):
     def forward(self, outputs, targets):
         iou = self.metric_fn(outputs, targets)
         return 1 - iou
-
-
-class SmoothBCEDiceIoULoss(nn.Module):
-    def __init__(
-        self,
-        eps: float = 1e-7,
-        smooth: float = 1e-6,
-        bce_weight: float = 1,
-        dice_weight: float = 1,
-        iou_weight: float = 1,
-    ):
-        super().__init__()
-        self.bce_weight = bce_weight
-        self.dice_weight = dice_weight
-        self.iou_weight = iou_weight
-
-        self.bce_loss = SmoothBCELoss(eps=smooth)
-        self.dice_loss = DiceLoss(eps=eps)
-        self.iou_loss = IoULoss(eps=eps)
-
-    def forward(self, outputs, targets):
-        bce = self.bce_loss(outputs, targets)
-        dice = self.dice_loss(outputs, targets)
-        iou = self.iou_loss(outputs, targets)
-
-        total = self.bce_weight * bce + self.dice_weight * dice + self.iou_weight * iou
-        return {"loss": total, "bce": bce, "dice": dice, "iou": iou}
 
 
 class BinaryFocalLoss(_Loss):
@@ -348,59 +220,15 @@ def dice(
     targets: torch.Tensor,
     eps: float = 1e-7,
     threshold: float = None,
+    soften: float = 0,
 ):
-    """
-    Computes the dice metric
-    Args:
-        outputs (list):  A list of predicted elements
-        targets (list): A list of elements that are to be predicted
-        eps (float): epsilon
-        threshold (float): threshold for outputs binarization
-    Returns:
-        double:  Dice score
-    """
     outputs = torch.sigmoid(outputs)
-
     if threshold is not None:
         outputs = (outputs > threshold).float()
-
     intersection = torch.sum(targets * outputs)
     union = torch.sum(targets) + torch.sum(outputs)
-    dice = 2 * intersection / (union + eps)
-
+    dice = (2 * intersection + soften) / (union + eps + soften)
     return dice
-
-
-def dice_classwise(
-    outputs: torch.Tensor,
-    targets: torch.Tensor,
-    eps: float = 1e-7,
-    threshold: float = None,
-):
-    """
-    Computes the dice metric for each class, and averages them together
-    Args:
-        outputs (list):  A list of predicted elements
-        targets (list): A list of elements that are to be predicted
-        eps (float): epsilon
-        threshold (float): threshold for outputs binarization
-    Returns:
-        double:  Dice score
-    """
-    outputs = torch.sigmoid(outputs)
-
-    if threshold is not None:
-        outputs = (outputs > threshold).float()
-
-    B, C, H, W = outputs.size()
-    for i, c in enumerate(range(C)):
-        intersection = torch.sum(targets[:, c, :, :] * outputs[:, c, :, :])
-        union = torch.sum(targets[:, c, :, :]) + torch.sum(outputs[:, c, :, :])
-        if i == 0:
-            dice = 2 * intersection / (union + eps)
-        else:
-            dice += 2 * intersection / (union + eps)
-    return dice / C
 
 
 def focal_loss_with_logits(

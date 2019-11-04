@@ -138,7 +138,7 @@ class Runner:
             "batch_size": train_cfg["data_loader"]["args"]["batch_size"],
             "bce_weight": train_cfg["loss"]["args"]["bce_weight"],
             "dice_weight": train_cfg["loss"]["args"]["dice_weight"],
-            "smooth": train_cfg["loss"]["args"]["smooth"],
+            "smooth": train_cfg["loss"]["args"].get("smooth", ""),
             "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
             "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
             "seed": train_cfg["seed"],
@@ -153,10 +153,10 @@ class Runner:
             df = pd.concat([df_existing, df_new])
             df.to_csv(log_filename, index=False)
         else:
-            log_filename.parents.mkdir(parents=True, exist_ok=True)
+            log_filename.parent.mkdir(parents=True, exist_ok=True)
             df_new.to_csv(log_filename, index=False)
 
-        if best_score < 0.60:
+        if best_score < 0.605:
             self.logger.critical(f"Skipping low scoring ({best_score}) model")
             return False
 
