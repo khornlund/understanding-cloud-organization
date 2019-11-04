@@ -146,7 +146,17 @@ def CutoutBase(height, width):
 
 def DistortionBase():
     return A.Compose(
-        [A.OneOf([A.IAAPerspective(p=1), A.ElasticTransform(p=1)], p=0.25)]
+        [
+            A.OneOf(
+                [
+                    A.IAAPerspective(),
+                    A.IAAPiecewiseAffine(),
+                    A.GridDistortion(),
+                    A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
+                ],
+                p=0.50,
+            )
+        ]
     )
 
 

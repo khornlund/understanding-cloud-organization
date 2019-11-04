@@ -12,6 +12,7 @@ class EnsembleManager:
         self.infer_config = infer_config
         setup_logging(infer_config)
         self.logger = setup_logger(self, infer_config["verbose"])
+        self.run_inference = infer_config.get("run_inference", False)
 
     def start(self, num_models):
         randomiser = ConfigurationRandomiser("experiments/training-template.yml")
@@ -39,9 +40,9 @@ class EnsembleManager:
                 # Log details for run
                 Indexer.index(checkpoint_dir)
 
-                # run inference using the best model
-                model_checkpoint = checkpoint_dir / "model_best.pth"
-                InferenceManager(self.infer_config).run(model_checkpoint)
+                if self.run_inference:  # run inference using the best model
+                    model_checkpoint = checkpoint_dir / "model_best.pth"
+                    InferenceManager(self.infer_config).run(model_checkpoint)
             except Exception as ex:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")
@@ -58,13 +59,7 @@ class ConfigurationRandomiser:
 
     def generate(self):
         config = self.base
-        for each in [
-            SeedOptions,
-            LossOptions,
-            AnnealOptions,
-            ModelOptions,
-            LearningRateOptions,
-        ]:
+        for each in [SeedOptions, LossOptions, ModelOptions, OptimizerOptions]:
             config = each.update(config)
         return config
 
@@ -97,21 +92,15 @@ class SeedOptions(ConfigOptionBase):
 class LossOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        bce_weights = [0.6, 0.7, 0.8]
-        smooth_factors = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+        bce_weights = [0.65, 0.70, 0.75]
         opts = []
         for bce_weight in bce_weights:
-            for smooth_factor in smooth_factors:
-                opts.append(
-                    {
-                        "type": "BCEDiceLoss",
-                        "args": {
-                            "bce_weight": bce_weight,
-                            "dice_weight": 1 - bce_weight,
-                            # "smooth": smooth_factor,
-                        },
-                    }
-                )
+            opts.append(
+                {
+                    "type": "BCEDiceLoss",
+                    "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
+                }
+            )
         return opts
 
     @classmethod
@@ -120,28 +109,14 @@ class LossOptions(ConfigOptionBase):
         return config
 
 
-class AnnealOptions(ConfigOptionBase):
-    @classmethod
-    def options(cls):
-        start_anneal = 1
-        n_epochs = np.random.choice(np.arange(35, 45))
-        return [{"start_anneal": start_anneal, "n_epochs": n_epochs}]
-
-    @classmethod
-    def update(cls, config):
-        option = cls.select()
-        config["lr_scheduler"]["args"]["start_anneal"] = int(option["start_anneal"])
-        config["lr_scheduler"]["args"]["n_epochs"] = int(option["n_epochs"])
-        return config
-
-
-class LearningRateOptions(ConfigOptionBase):
+class OptimizerOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
         return [
             {
-                "encoder": np.random.choice([3e-5, 5e-5, 7e-5]),
-                "decoder": np.random.choice([1e-3, 2e-3, 3e-3]),
+                "optim": np.random.choice(["RAdam, QHAdamW"]),
+                "encoder": np.random.choice([5e-5, 7e-5, 9e-5]),
+                "decoder": np.random.choice([3e-3, 4e-3]),
             }
         ]
 
@@ -163,22 +138,13 @@ class ModelOptions(ConfigOptionBase):
                     # "LightTransforms",
                     "CutoutTransforms",
                     "DistortionTransforms",
-                    # "CutoutDistortionTransforms",
-                    "HeavyResizeTransforms",
+                    "CutoutDistortionTransforms",
+                    # "HeavyResizeTransforms",
                 ]
             )
         )
         return [
             # unet - inceptionv4
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "inceptionv4", "dropout": dropout},
-                "batch_size": 48,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 192, "width": 228},
-                },
-            },
             {
                 "type": "Unet",
                 "args": {"encoder_name": "inceptionv4", "dropout": dropout},
@@ -198,15 +164,6 @@ class ModelOptions(ConfigOptionBase):
                 },
             },
             # unet - inceptionresnetv2
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "inceptionresnetv2", "dropout": dropout},
-                "batch_size": 40,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 192, "width": 228},
-                },
-            },
             {
                 "type": "Unet",
                 "args": {"encoder_name": "inceptionresnetv2", "dropout": dropout},

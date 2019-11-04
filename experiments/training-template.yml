@@ -30,8 +30,8 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 36
-    start_anneal: 1
+    n_epochs: 26
+    start_anneal: 2
 
 metrics:
 - dice_0
@@ -53,8 +53,8 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  early_stop: 4
-  epochs: 35
+  early_stop: 5
+  epochs: 25
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1

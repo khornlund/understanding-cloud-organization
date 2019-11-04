@@ -33,4 +33,5 @@ dependencies:
   - pip
   - pip:
     - albumentations
+    - safitty
     - -e .  # install package in development mode
