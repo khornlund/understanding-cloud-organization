@@ -1,10 +1,10 @@
 import click
 from pathlib import Path
 
-from uco.manager import EnsembleManager
-from uco.runner import Runner
+from uco.ensemble import EnsembleManager
+from uco.runner import TrainingManager, InferenceManager
 from uco.h5 import HDF5PredictionReducer
-from uco.utils import load_config, load_train_config, kaggle_submit
+from uco.utils import load_config, load_train_config, kaggle_submit, Indexer
 
 
 @click.group()
@@ -74,7 +74,7 @@ def train(config_filename, resume):
     """
     configs = [load_train_config(f) for f in config_filename]
     for config in configs:
-        Runner(config).train(resume)
+        TrainingManager(config).run(resume)
 
 
 @cli.command()
@@ -96,7 +96,7 @@ def predict(config_filename, model_checkpoint):
     Perform inference using saved model weights, and save to HDF5 database.
     """
     config = load_config(config_filename)
-    Runner(config).predict(model_checkpoint)
+    InferenceManager(config).run(model_checkpoint)
 
 
 @cli.command()
@@ -105,4 +105,10 @@ def predict_all():
     checkpoints = list(Path("saved").glob("sever*/**/*model_best.pth"))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
-        Runner(config).predict(checkpoint)
+        InferenceManager(config).run(checkpoint)
+
+
+@cli.command()
+@click.option("-f", "--folder", type=str, required=True, help="Folder to index")
+def reindex(folder):
+    Indexer.reindex(folder)

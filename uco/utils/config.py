@@ -15,7 +15,7 @@ def load_train_config(filename: str) -> dict:
     Load a configuration file as YAML and assign the experiment a verbose name.
     """
     config = load_config(filename)
-    config["name"] = verbose_config_name(config)
+    # config["name"] = verbose_config_name(config)
     return config
 
 

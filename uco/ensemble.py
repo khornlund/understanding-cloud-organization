@@ -3,14 +3,8 @@ from copy import deepcopy
 
 import numpy as np
 
-from uco.runner import Runner
-from uco.utils import (
-    setup_logger,
-    setup_logging,
-    load_config,
-    verbose_config_name,
-    seed_everything,
-)
+from uco.runner import TrainingManager, InferenceManager
+from uco.utils import setup_logger, setup_logging, load_config, seed_everything, Indexer
 
 
 class EnsembleManager:
@@ -30,22 +24,24 @@ class EnsembleManager:
                 self.logger.info(f"Using seed: {seed}")
                 seed_everything(seed)
                 train_config = randomiser.generate()
-                train_config["name"] = verbose_config_name(train_config)
 
                 self.logger.info(
-                    f"Starting {train_config['name']} using seed {train_config['seed']}"
+                    f"Starting seed {train_config['seed']}: {train_config}"
                 )
 
                 # perform training
-                checkpoint_dir = Runner(train_config).train(None)
-
-                # run inference using the best model
-                model_checkpoint = checkpoint_dir / "model_best.pth"
-                Runner(self.infer_config).predict(model_checkpoint)
+                checkpoint_dir = TrainingManager(train_config).run(None)
 
                 # delete other checkpoints
                 for f in checkpoint_dir.glob("checkpoint-epoch*.pth"):
                     f.unlink()
+
+                # Log details for run
+                Indexer.index(checkpoint_dir)
+
+                # run inference using the best model
+                model_checkpoint = checkpoint_dir / "model_best.pth"
+                InferenceManager(self.infer_config).run(model_checkpoint)
             except Exception as ex:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")

@@ -3,7 +3,7 @@ import logging
 import logging.config
 from pathlib import Path
 
-from .saving import log_path
+from .saving import get_log_path
 
 
 def setup_logging(
@@ -33,10 +33,10 @@ def setup_logging(
         config = yaml.safe_load(f.read())
 
     # modify logging paths based on run config
-    run_path = log_path(run_config)
+    log_path = get_log_path(run_config)
     for _, handler in config["handlers"].items():
         if "filename" in handler:
-            handler["filename"] = str(run_path / handler["filename"])
+            handler["filename"] = str(log_path / handler["filename"])
 
     logging.config.dictConfig(config)
 

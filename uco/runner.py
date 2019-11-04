@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any, List, Tuple
 from types import ModuleType
 
-import pandas as pd
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -20,147 +19,34 @@ from uco.utils import setup_logger, setup_logging, TensorboardWriter, seed_every
 from uco.h5 import HDF5PredictionWriter
 
 
-class Runner:
-    """
-    Top level class to construct objects for training.
-    """
-
+class ManagerBase:
     def __init__(self, config: dict):
         setup_logging(config)
         seed_everything(config["seed"])
         self.logger = setup_logger(self, config["verbose"])
         self.cfg = config
 
-    def train(self, resume: str) -> None:
-        cfg = self.cfg.copy()
+    def get_instance(
+        self, module: ModuleType, name: str, config: dict, *args: Any
+    ) -> Any:
+        """
+        Helper to construct an instance of a class.
 
-        model = self.get_instance(module_arch, "arch", cfg)
-        model, device = self.setup_device(model, cfg["target_devices"])
-        torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
-
-        param_groups = self.setup_param_groups(model, cfg["optimizer"])
-        optimizer = self.get_instance(module_optimizer, "optimizer", cfg, param_groups)
-        lr_scheduler = self.get_instance(
-            module_scheduler, "lr_scheduler", cfg, optimizer
-        )
-        model, optimizer, start_epoch = self.resume_checkpoint(
-            resume, model, optimizer, cfg
-        )
-        try:
-            transforms = self.get_instance(module_aug, "augmentation", cfg)
-        except:
-            cfg["augmentation"]["type"] = "LightTransforms"
-            transforms = self.get_instance(module_aug, "augmentation", cfg)
-
-        data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
-        valid_data_loader = data_loader.split_validation()
-
-        self.logger.info("Getting loss and metric function handles")
-        loss = self.get_instance(module_loss, "loss", cfg).to(device)
-        metrics = [getattr(module_metric, met) for met in cfg["metrics"]]
-
-        self.logger.info("Initialising trainer")
-        trainer = Trainer(
-            model,
-            loss,
-            metrics,
-            optimizer,
-            start_epoch=start_epoch,
-            config=cfg,
-            device=device,
-            data_loader=data_loader,
-            valid_data_loader=valid_data_loader,
-            lr_scheduler=lr_scheduler,
-        )
-
-        checkpoint_dir = trainer.train()
-        self.logger.info("Training completed.")
-        return checkpoint_dir
-
-    def predict(self, model_checkpoint: str) -> None:
-        cfg = self.cfg.copy()
-
-        checkpoint = self.load_checkpoint(model_checkpoint)
-        if not self.log_score(checkpoint, cfg["output"]["log"]):
-            return
-        train_cfg = checkpoint["config"]
-
-        model = self.get_instance(module_arch, "arch", train_cfg)
-        model, device = self.setup_device(model, cfg["target_devices"])
-        model.load_state_dict(checkpoint["state_dict"])
-        torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
-
-        transforms = self.get_instance(module_aug, "augmentation", train_cfg)
-        data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
-
-        timestamp = Path(model_checkpoint).parent.parent.name
-        rw = HDF5PredictionWriter(filename=cfg["output"]["h5"], dataset=str(timestamp))
-        writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
-        writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
-        self.logger.info("Performing inference")
-        model.eval()
-        with torch.no_grad():
-            for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
-                data = data.to(device)
-                output = torch.sigmoid(model(data))
-                if bidx % 10 == 0:
-                    self.log_predictions_tensorboard(writer, bidx, data, output)
-                output = output.cpu().numpy()
-                rw.write(output)
-
-        self.logger.info(rw.close())
-
-    # -- helpers ---------------------------------------------------------------------
-
-    def log_predictions_tensorboard(self, writer, bidx, data, output):
-        writer.set_step(bidx, "inference")
-        data, output = data.cpu(), output.cpu()
-        data_grayscale = torch.mean(data, dim=1, keepdim=True)
-        for c in range(4):
-            image = torch.cat([data_grayscale, output[:, c : c + 1, :, :]], dim=0)
-            writer.add_image(
-                f"class_{c}",
-                make_grid(image, nrow=data.size(0), normalize=True, scale_each=True),
-            )
-
-    def log_score(self, checkpoint, log_filename):
-        best_score = checkpoint["monitor_best"].item()
-        train_cfg = checkpoint["config"]
-
-        settings = {
-            "mean_dice": best_score,
-            "encoder": train_cfg["arch"]["args"]["encoder_name"],
-            "decoder": train_cfg["arch"]["type"],
-            "dropout": train_cfg["arch"]["args"]["dropout"],
-            "augs": train_cfg["augmentation"]["type"],
-            "img_height": train_cfg["augmentation"]["args"]["height"],
-            "img_width": train_cfg["augmentation"]["args"]["width"],
-            "batch_size": train_cfg["data_loader"]["args"]["batch_size"],
-            "bce_weight": train_cfg["loss"]["args"]["bce_weight"],
-            "dice_weight": train_cfg["loss"]["args"]["dice_weight"],
-            "smooth": train_cfg["loss"]["args"].get("smooth", ""),
-            "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
-            "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
-            "seed": train_cfg["seed"],
-        }
-        df_new = pd.DataFrame([settings])
-
-        log_filename = Path(log_filename)
-        if log_filename.exists():
-            df_existing = pd.read_csv(log_filename)
-            for new_col in [c for c in df_new.columns if c not in df_existing.columns]:
-                df_existing[new_col] = ""
-            df = pd.concat([df_existing, df_new])
-            df.to_csv(log_filename, index=False)
-        else:
-            log_filename.parent.mkdir(parents=True, exist_ok=True)
-            df_new.to_csv(log_filename, index=False)
-
-        if best_score < 0.605:
-            self.logger.critical(f"Skipping low scoring ({best_score}) model")
-            return False
-
-        return True
+        Parameters
+        ----------
+        module : ModuleType
+            Module containing the class to construct.
+        name : str
+            Name of class, as would be returned by ``.__class__.__name__``.
+        config : dict
+            Dictionary containing an 'args' item, which will be used as ``kwargs`` to
+            construct the class instance.
+        args : Any
+            Positional arguments to be given before ``kwargs`` in ``config``.
+        """
+        ctor_name = config[name]["type"]
+        self.logger.info(f"Building: {module.__name__}.{ctor_name}")
+        return getattr(module, ctor_name)(*args, **config[name]["args"])
 
     def setup_device(
         self, model: nn.Module, target_devices: List[int]
@@ -205,6 +91,58 @@ class Runner:
         else:
             model = model.to(device)
         return model, device
+
+
+class TrainingManager(ManagerBase):
+    """
+    Top level class to construct objects for training.
+    """
+
+    def run(self, resume: str) -> None:
+        cfg = self.cfg.copy()
+
+        model = self.get_instance(module_arch, "arch", cfg)
+        model, device = self.setup_device(model, cfg["target_devices"])
+        torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
+
+        param_groups = self.setup_param_groups(model, cfg["optimizer"])
+        optimizer = self.get_instance(module_optimizer, "optimizer", cfg, param_groups)
+        lr_scheduler = self.get_instance(
+            module_scheduler, "lr_scheduler", cfg, optimizer
+        )
+        model, optimizer, start_epoch = self.resume_checkpoint(
+            resume, model, optimizer, cfg
+        )
+        try:
+            transforms = self.get_instance(module_aug, "augmentation", cfg)
+        except:
+            cfg["augmentation"]["type"] = "LightTransforms"
+            transforms = self.get_instance(module_aug, "augmentation", cfg)
+
+        data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
+        valid_data_loader = data_loader.split_validation()
+
+        self.logger.info("Getting loss and metric function handles")
+        loss = self.get_instance(module_loss, "loss", cfg).to(device)
+        metrics = [getattr(module_metric, met) for met in cfg["metrics"]]
+
+        self.logger.info("Initialising trainer")
+        trainer = Trainer(
+            model,
+            loss,
+            metrics,
+            optimizer,
+            start_epoch=start_epoch,
+            config=cfg,
+            device=device,
+            data_loader=data_loader,
+            valid_data_loader=valid_data_loader,
+            lr_scheduler=lr_scheduler,
+        )
+
+        checkpoint_dir = trainer.train()
+        self.logger.info("Training completed.")
+        return checkpoint_dir
 
     def setup_param_groups(self, model: nn.Module, config: dict) -> dict:
         """
@@ -274,6 +212,67 @@ class Runner:
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer, checkpoint["epoch"]
 
+
+class InferenceManager(ManagerBase):
+    """
+    Top level class to perform inference.
+    """
+
+    SCORE_THRESHOLD = 0.605
+
+    def run(self, model_checkpoint: str) -> None:
+        cfg = self.cfg.copy()
+
+        checkpoint = self.load_checkpoint(model_checkpoint)
+        if not self.check_score(checkpoint):
+            return
+        train_cfg = checkpoint["config"]
+
+        model = self.get_instance(module_arch, "arch", train_cfg)
+        model, device = self.setup_device(model, cfg["target_devices"])
+        model.load_state_dict(checkpoint["state_dict"])
+        torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
+
+        transforms = self.get_instance(module_aug, "augmentation", train_cfg)
+        data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
+
+        timestamp = Path(model_checkpoint).parent.parent.name
+        rw = HDF5PredictionWriter(filename=cfg["output"]["h5"], dataset=str(timestamp))
+        writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
+        writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
+        self.logger.info("Performing inference")
+        model.eval()
+        with torch.no_grad():
+            for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
+                data = data.to(device)
+                output = torch.sigmoid(model(data))
+                if bidx % 10 == 0:
+                    self.log_predictions_tensorboard(writer, bidx, data, output)
+                output = output.cpu().numpy()
+                rw.write(output)
+
+        self.logger.info(rw.close())
+
+    # -- helpers ---------------------------------------------------------------------
+
+    def log_predictions_tensorboard(self, writer, bidx, data, output):
+        writer.set_step(bidx, "inference")
+        data, output = data.cpu(), output.cpu()
+        data_grayscale = torch.mean(data, dim=1, keepdim=True)
+        for c in range(4):
+            image = torch.cat([data_grayscale, output[:, c : c + 1, :, :]], dim=0)
+            writer.add_image(
+                f"class_{c}",
+                make_grid(image, nrow=data.size(0), normalize=True, scale_each=True),
+            )
+
+    def check_score(self, checkpoint):
+        best_score = checkpoint["monitor_best"].item()
+        if best_score < self.SCORE_THRESHOLD:
+            self.logger.warning(f"Skipping low scoring ({best_score}) model")
+            return False
+        return True
+
     def load_checkpoint(self, path):
         """
         Load a saved checkpoint.
@@ -283,25 +282,3 @@ class Runner:
         self.logger.info(f'Checkpoint "{path}" loaded.')
         self.logger.info(f'Best score: {checkpoint["monitor_best"]}')
         return checkpoint
-
-    def get_instance(
-        self, module: ModuleType, name: str, config: dict, *args: Any
-    ) -> Any:
-        """
-        Helper to construct an instance of a class.
-
-        Parameters
-        ----------
-        module : ModuleType
-            Module containing the class to construct.
-        name : str
-            Name of class, as would be returned by ``.__class__.__name__``.
-        config : dict
-            Dictionary containing an 'args' item, which will be used as ``kwargs`` to
-            construct the class instance.
-        args : Any
-            Positional arguments to be given before ``kwargs`` in ``config``.
-        """
-        ctor_name = config[name]["type"]
-        self.logger.info(f"Building: {module.__name__}.{ctor_name}")
-        return getattr(module, ctor_name)(*args, **config[name]["args"])

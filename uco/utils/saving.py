@@ -1,7 +1,7 @@
 from pathlib import Path
 import datetime
 
-
+TRAINING_DIR = "training"
 LOG_DIR = "logs"
 CHECKPOINT_DIR = "checkpoints"
 RUN_DIR = "runs"
@@ -16,36 +16,25 @@ def ensure_exists(p: Path) -> Path:
     return p
 
 
-def arch_path(config: dict) -> Path:
-    """
-    Construct a path based on the name of a configuration file eg. 'saved/EfficientNet'
-    """
-    p = Path(config["save_dir"]) / config["name"]
-    return ensure_exists(p)
-
-
-def arch_datetime_path(config: dict) -> Path:
+def datetime_path(config: dict) -> Path:
     start_time = datetime.datetime.now().strftime("%m%d-%H%M%S")
-    p = arch_path(config) / start_time
+    p = Path(config["save_dir"]) / TRAINING_DIR / start_time
     return ensure_exists(p)
 
 
-def log_path(config: dict) -> Path:
-    p = arch_path(config) / LOG_DIR
+def get_log_path(config: dict) -> Path:
+    p = Path(config["save_dir"]) / LOG_DIR
     return ensure_exists(p)
 
 
-def trainer_paths(config: dict) -> Path:
+def get_trainer_paths(config: dict) -> Path:
     """
     Returns the paths to save checkpoints and tensorboard runs. eg.
 
     .. code::
 
-        saved/EfficientNet/1002-123456/checkpoints
-        saved/EfficientNet/1002-123456/runs
+        saved/1002-123456/checkpoints
+        saved/1002-123456/runs
     """
-    arch_datetime = arch_datetime_path(config)
-    return (
-        ensure_exists(arch_datetime / CHECKPOINT_DIR),
-        ensure_exists(arch_datetime / RUN_DIR),
-    )
+    parent = datetime_path(config)
+    return (ensure_exists(parent / CHECKPOINT_DIR), ensure_exists(parent / RUN_DIR))

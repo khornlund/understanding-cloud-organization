@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 import torch
 
-from uco.utils import setup_logger, trainer_paths, TensorboardWriter
+from uco.utils import setup_logger, get_trainer_paths, TensorboardWriter
 
 
 class TrainerBase:
@@ -25,7 +25,7 @@ class TrainerBase:
 
         self._setup_monitoring(config["training"])
 
-        self.checkpoint_dir, writer_dir = trainer_paths(config)
+        self.checkpoint_dir, writer_dir = get_trainer_paths(config)
         self.writer = TensorboardWriter(writer_dir, config["training"]["tensorboard"])
 
         # Save configuration file into checkpoint directory:
