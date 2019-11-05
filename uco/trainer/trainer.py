@@ -203,5 +203,5 @@ class Trainer(TrainerBase):
         torch.cuda.empty_cache()
 
         log = {f"val_{mtr.name}": mtr.avg for mtr in loss_mtrs}
-        log["val_metrics"]: [mtr.avg for mtr in metric_mtrs]
+        log["val_metrics"] = [mtr.avg for mtr in metric_mtrs]
         return log

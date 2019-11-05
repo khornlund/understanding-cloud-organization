@@ -34,4 +34,5 @@ dependencies:
   - pip:
     - albumentations
     - safitty
+    - git+https://github.com/qubvel/ttach
     - -e .  # install package in development mode

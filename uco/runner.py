@@ -4,6 +4,7 @@ from types import ModuleType
 
 import torch
 import torch.nn as nn
+import ttach as tta
 from tqdm import tqdm
 from torchvision.utils import make_grid
 
@@ -223,16 +224,22 @@ class InferenceManager(ManagerBase):
 
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()
-
-        checkpoint = self.load_checkpoint(model_checkpoint)
+        device = self.setup_device(cfg["device"])
+        checkpoint = self.load_checkpoint(model_checkpoint, device)
         if not self.check_score(checkpoint):
             return
         train_cfg = checkpoint["config"]
 
         model = self.get_instance(module_arch, "arch", train_cfg)
-        model, device = self.setup_device(model, cfg["target_devices"])
+        model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
+
+        tta_model = tta.SegmentationTTAWrapper(
+            model,
+            tta.Compose([tta.HorizontalFlip(), tta.VerticalFlip()]),
+            merge_mode="mean",
+        )
 
         transforms = self.get_instance(module_aug, "augmentation", train_cfg)
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
@@ -242,11 +249,11 @@ class InferenceManager(ManagerBase):
         writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
         writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
         self.logger.info("Performing inference")
-        model.eval()
+        tta_model.eval()
         with torch.no_grad():
             for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
                 data = data.to(device)
-                output = torch.sigmoid(model(data))
+                output = torch.sigmoid(tta_model(data))
                 if bidx % 10 == 0:
                     self.log_predictions_tensorboard(writer, bidx, data, output)
                 output = output.cpu().numpy()
@@ -269,17 +276,22 @@ class InferenceManager(ManagerBase):
 
     def check_score(self, checkpoint):
         best_score = checkpoint["monitor_best"].item()
+        self.logger.info(f"Best score: {best_score}")
         if best_score < self.SCORE_THRESHOLD:
-            self.logger.warning(f"Skipping low scoring ({best_score}) model")
+            self.logger.warning(f"Skipping low scoring model")
             return False
         return True
 
-    def load_checkpoint(self, path):
+    def load_checkpoint(self, path, device):
         """
         Load a saved checkpoint.
         """
         self.logger.info(f"Loading checkpoint: {path}")
-        checkpoint = torch.load(path)
-        self.logger.info(f'Checkpoint "{path}" loaded.')
-        self.logger.info(f'Best score: {checkpoint["monitor_best"]}')
+        checkpoint = torch.load(path, map_location=device)
         return checkpoint
+
+    def setup_device(self, device):
+        if device is None or device == "cpu":
+            return torch.device("cpu")
+        else:
+            return torch.device(device)

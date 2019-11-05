@@ -342,7 +342,7 @@ def flatten_binary_scores(scores, labels, ignore=None):
     return vscores, vlabels
 
 
-class StableBCELoss(torch.nn.modules.Module):
+class StableBCELoss(nn.Module):
     def __init__(self):
         super().__init__()
 
