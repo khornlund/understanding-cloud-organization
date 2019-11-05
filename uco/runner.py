@@ -107,6 +107,7 @@ class TrainingManager(ManagerBase):
 
         param_groups = self.setup_param_groups(model, cfg["optimizer"])
         optimizer = self.get_instance(module_optimizer, "optimizer", cfg, param_groups)
+        # optimizer = module_optimizer.Lookahead(optimizer)
         lr_scheduler = self.get_instance(
             module_scheduler, "lr_scheduler", cfg, optimizer
         )
@@ -218,7 +219,7 @@ class InferenceManager(ManagerBase):
     Top level class to perform inference.
     """
 
-    SCORE_THRESHOLD = 0.605
+    SCORE_THRESHOLD = 0.602
 
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()

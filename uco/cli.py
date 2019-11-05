@@ -100,9 +100,16 @@ def predict(config_filename, model_checkpoint):
 
 
 @cli.command()
-def predict_all():
+@click.option(
+    "-f",
+    "--folder",
+    type=str,
+    default="saved/training",
+    help="Folder containing checkpoints",
+)
+def predict_all(folder):
     config = load_config("experiments/inference.yml")
-    checkpoints = list(Path("saved").glob("sever*/**/*model_best.pth"))
+    checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
         InferenceManager(config).run(checkpoint)

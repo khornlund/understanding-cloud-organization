@@ -277,8 +277,9 @@ class CosineAnnealingScheduler(_LRScheduler):
         return lrs
 
     def get_lr(self):
+        curve_idx = min(self._step_count - 1, len(self.curve) - 1)
         for i, init_lr in enumerate(self.initial_lrs):
-            lr = init_lr * self.curve[self._step_count - 1]
+            lr = init_lr * self.curve[curve_idx]
             yield lr
 
 

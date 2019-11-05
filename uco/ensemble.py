@@ -35,10 +35,14 @@ class EnsembleManager:
 
                 # delete other checkpoints
                 for f in checkpoint_dir.glob("checkpoint-epoch*.pth"):
+                    if "model_best" in f.name:
+                        self.logger.warning(f"Search found {f}")
+                        continue
+                    self.logger.info(f"Deleting {f}")
                     f.unlink()
 
                 # Log details for run
-                Indexer.index(checkpoint_dir)
+                Indexer.index(checkpoint_dir.parent)
 
                 if self.run_inference:  # run inference using the best model
                     model_checkpoint = checkpoint_dir / "model_best.pth"
@@ -114,7 +118,7 @@ class OptimizerOptions(ConfigOptionBase):
     def options(cls):
         return [
             {
-                "optim": np.random.choice(["RAdam, QHAdamW"]),
+                "optim": np.random.choice(["RAdam", "QHAdamW"]),
                 "encoder": np.random.choice([5e-5, 7e-5, 9e-5]),
                 "decoder": np.random.choice([3e-3, 4e-3]),
             }
@@ -123,6 +127,7 @@ class OptimizerOptions(ConfigOptionBase):
     @classmethod
     def update(cls, config):
         option = cls.select()
+        config["optimizer"]["type"] = str(option["optim"])
         config["optimizer"]["encoder"]["lr"] = float(option["encoder"])
         config["optimizer"]["decoder"]["lr"] = float(option["decoder"])
         return config
@@ -196,7 +201,7 @@ class ModelOptions(ConfigOptionBase):
             {
                 "type": "Unet",
                 "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                "batch_size": 28,
+                "batch_size": 24,
                 "augmentation": {
                     "type": transforms,
                     "args": {"height": 256, "width": 384},

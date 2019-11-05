@@ -59,9 +59,7 @@ class Trainer(TrainerBase):
             elif i == 1:
                 self.writer.add_scalar("LR/decoder", param_group["lr"])
 
-        losses_comb = AverageMeter("loss_comb")
-        losses_bce = AverageMeter("loss_bce")
-        losses_dice = AverageMeter("loss_dice")
+        loss_mtrs = [AverageMeter(loss) for loss in ["loss", "bce", "dice", "lovasz"]]
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]
         # visualize_batch = np.random.choice(np.arange(len(self.data_loader) - 1))
         for batch_idx, (data, target) in enumerate(self.data_loader):
@@ -71,20 +69,18 @@ class Trainer(TrainerBase):
             output = self.model(data)
             loss_dict = self.loss(output, target)
             loss = loss_dict["loss"]
-            bce = loss_dict.get("bce", torch.tensor([0]))
-            dice = loss_dict.get("dice", torch.tensor([0]))
             loss.backward()
             self.optimizer.step()
 
-            losses_comb.update(loss.item(), data.size(0))
-            losses_bce.update(bce.item(), data.size(0))
-            losses_dice.update(dice.item(), data.size(0))
+            for mtr in loss_mtrs:
+                mtr.update(
+                    loss_dict.get(mtr.name, torch.tensor([0])).item(), data.size(0)
+                )
 
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch) * len(self.data_loader) + batch_idx)
-                self.writer.add_scalar("batch/loss", loss.item())
-                self.writer.add_scalar("batch/bce", bce.item())
-                self.writer.add_scalar("batch/dice", dice.item())
+                for mtr in loss_mtrs:
+                    self.writer.add_scalar(f"batch/{mtr.name}", mtr.val)
                 for mtr, value in zip(metric_mtrs, self._eval_metrics(output, target)):
                     mtr.update(value, data.size(0))
                     self.writer.add_scalar(f"batch/{mtr.name}", value)
@@ -120,13 +116,13 @@ class Trainer(TrainerBase):
         del output
         torch.cuda.empty_cache()
 
-        self.writer.add_scalar("epoch/loss", losses_comb.avg)
-        self.writer.add_scalar("epoch/bce", losses_bce.avg)
-        self.writer.add_scalar("epoch/dice", losses_dice.avg)
+        for mtr in loss_mtrs:
+            self.writer.add_scalar(f"epoch/{mtr.name}", mtr.avg)
         for mtr in metric_mtrs:
             self.writer.add_scalar(f"epoch/{mtr.name}", mtr.avg)
 
-        log = {"loss": losses_comb.avg, "metrics": [mtr.avg for mtr in metric_mtrs]}
+        log = {mtr.name: mtr.avg for mtr in loss_mtrs}
+        log["metrics"]: [mtr.avg for mtr in metric_mtrs]
 
         if self.do_validation and (epoch % 2 == 0 or epoch >= self.start_val_epoch):
             val_log = self._valid_epoch(epoch)
@@ -164,9 +160,7 @@ class Trainer(TrainerBase):
         """
         self.model.eval()
         self.writer.set_step(epoch, "valid")
-        losses_comb = AverageMeter("loss_comb")
-        losses_bce = AverageMeter("loss_bce")
-        losses_dice = AverageMeter("loss_dice")
+        loss_mtrs = [AverageMeter(loss) for loss in ["loss", "bce", "dice", "lovasz"]]
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]
         # visualize_batch = np.random.choice(np.arange(len(self.valid_data_loader) - 1))
         with torch.no_grad():
@@ -174,13 +168,11 @@ class Trainer(TrainerBase):
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 loss_dict = self.loss(output, target)
-                loss = loss_dict["loss"]
-                bce = loss_dict.get("bce", torch.tensor([0]))
-                dice = loss_dict.get("dice", torch.tensor([0]))
 
-                losses_comb.update(loss.item(), data.size(0))
-                losses_bce.update(bce.item(), data.size(0))
-                losses_dice.update(dice.item(), data.size(0))
+                for mtr in loss_mtrs:
+                    mtr.update(
+                        loss_dict.get(mtr.name, torch.tensor([0])).item(), data.size(0)
+                    )
                 for mtr, value in zip(metric_mtrs, self._eval_metrics(output, target)):
                     mtr.update(value, data.size(0))
 
@@ -200,9 +192,8 @@ class Trainer(TrainerBase):
                 #             nrow=data.size(0), normalize=True, scale_each=True)
                 #         )
 
-        self.writer.add_scalar("loss", losses_comb.avg)
-        self.writer.add_scalar("bce", losses_bce.avg)
-        self.writer.add_scalar("dice", losses_dice.avg)
+        for mtr in loss_mtrs:
+            self.writer.add_scalar(mtr.name, mtr.avg)
         for mtr in metric_mtrs:
             self.writer.add_scalar(mtr.name, mtr.avg)
 
@@ -211,7 +202,6 @@ class Trainer(TrainerBase):
         del output
         torch.cuda.empty_cache()
 
-        return {
-            "val_loss": losses_comb.avg,
-            "val_metrics": [mtr.avg for mtr in metric_mtrs],
-        }
+        log = {f"val_{mtr.name}": mtr.avg for mtr in loss_mtrs}
+        log["val_metrics"]: [mtr.avg for mtr in metric_mtrs]
+        return log

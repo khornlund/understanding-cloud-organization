@@ -7,23 +7,6 @@ from tqdm import tqdm
 
 class Indexer:
 
-    fields = [
-        "mean_dice",
-        "encoder",
-        "decoder",
-        "dropout",
-        "augs",
-        "img_height",
-        "img_width",
-        "batch_size",
-        "bce_weight",
-        "dice_weight",
-        "smooth",
-        "encoder_lr",
-        "decoder_lr",
-        "seed",
-    ]
-
     checkpoint_partial_path = "checkpoints/model_best.pth"
     index_filename = "index.csv"
 
@@ -40,6 +23,7 @@ class Indexer:
             except Exception as ex:
                 print(f"{child}: {ex}")
         df = pd.DataFrame.from_records(items)
+        df.sort_values("run", inplace=True)
         save_as = path / cls.index_filename
         df.to_csv(save_as, index=False)
 
@@ -53,6 +37,7 @@ class Indexer:
             df.append(config, ignore_index=True)
         except FileNotFoundError:
             df = pd.DataFrame.from_records([config])
+        df.sort_values("run", inplace=True)
         df.to_csv(index_filename, index=False)
 
     @classmethod
@@ -76,6 +61,7 @@ class Indexer:
             "batch_size": train_cfg["data_loader"]["args"]["batch_size"],
             "bce_weight": train_cfg["loss"]["args"]["bce_weight"],
             "dice_weight": train_cfg["loss"]["args"]["dice_weight"],
+            "optimizer": train_cfg["optimizer"]["type"],
             "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
             "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
             "seed": train_cfg["seed"],

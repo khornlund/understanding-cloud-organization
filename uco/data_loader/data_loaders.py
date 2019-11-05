@@ -127,18 +127,6 @@ class CloudSegPseudoDataLoader(DataLoaderBase):
             )
 
 
-def pivot_df(df):
-    df["Image"], df["Label"] = zip(*df["Image_Label"].str.split("_"))
-    df = df.pivot(index="Image", columns="Label", values="EncodedPixels")
-    df.columns = [f"rle{c}" for c in range(4)]
-    df["n_classes"] = df.count(axis=1)
-
-    # add classification columns
-    for c in range(4):
-        df[f"c{c}"] = df[f"rle{c}"].apply(lambda rle: not pd.isnull(rle))
-    return df
-
-
 class CloudSegTestDataLoader(DataLoaderBase):
 
     test_csv = "sample_submission.csv"
@@ -164,3 +152,15 @@ class CloudSegTestDataLoader(DataLoaderBase):
         df["Image"] = df["Image"].apply(lambda f: f.split("_")[0])
         df.set_index("Image", inplace=True)
         return df
+
+
+def pivot_df(df):
+    df["Image"], df["Label"] = zip(*df["Image_Label"].str.split("_"))
+    df = df.pivot(index="Image", columns="Label", values="EncodedPixels")
+    df.columns = [f"rle{c}" for c in range(4)]
+    df["n_classes"] = df.count(axis=1)
+
+    # add classification columns
+    for c in range(4):
+        df[f"c{c}"] = df[f"rle{c}"].apply(lambda rle: not pd.isnull(rle))
+    return df
