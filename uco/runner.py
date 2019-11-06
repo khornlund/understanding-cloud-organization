@@ -220,7 +220,7 @@ class InferenceManager(ManagerBase):
     Top level class to perform inference.
     """
 
-    SCORE_THRESHOLD = 0.602
+    SCORE_THRESHOLD = 0.610
 
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()

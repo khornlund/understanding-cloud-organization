@@ -70,8 +70,9 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
     """
 
     sample_csv = "sample_submission.csv"
+    # min_sizes = np.array([9573, 9670, 9019, 7885])
     min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.65, 0.65, 0.65, 0.65])
+    top_thresholds = np.array([0.60, 0.60, 0.60, 0.60])
     bot_thresholds = np.array([0.5, 0.5, 0.5, 0.5])
 
     def __init__(self, verbose=2):
@@ -83,22 +84,26 @@ class HDF5PredictionReducer(HDF5ReaderWriterBase):
         data_dir = Path(data_dir)
         sample_df = pd.read_csv(data_dir / self.sample_csv)
         throwaway_counter = np.array([0, 0, 0, 0])
+        positive_counter = np.array([0, 0, 0, 0])
         with h5py.File(predictions_filename, "r") as f:
+            n_predictions = sum([1 for _ in f.keys()])
+            self.logger.info(f"Averaging {n_predictions} predictions")
             for n in tqdm(range(self.N), total=self.N):
                 pred_stack = np.stack([f[k][n, :, :, :] for k in f.keys()], axis=0)
                 pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
                 rles, throwaways = self.process(pred_mean)
                 throwaway_counter += throwaways
                 for c, rle in enumerate(rles):
+                    if rle != "":
+                        positive_counter[c] += 1
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
         pseudo_csv = data_dir / "pseudo.csv"
         submission_csv = Path(predictions_filename).parent / reduced_filename
         sample_df.to_csv(pseudo_csv, index=False)
         sample_df.to_csv(submission_csv, index=False)
         self.logger.info(f"Threw away {throwaway_counter} predictions under min size")
-        self.logger.info(
-            f'Reduced predictions to "{pseudo_csv}" and "{submission_csv}"'
-        )
+        self.logger.info(f"Positive predictions: {positive_counter}")
+        self.logger.info(f'saved predictions to "{pseudo_csv}" and "{submission_csv}"')
 
     def process(self, predictions):
         """

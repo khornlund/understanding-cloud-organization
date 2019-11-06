@@ -51,6 +51,7 @@ class Trainer(TrainerBase):
                 p.requires_grad = True
             self.unfreeze_encoder = None
 
+        self.loss.set_epoch(epoch)
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
         for i, param_group in enumerate(self.optimizer.param_groups):
@@ -58,6 +59,7 @@ class Trainer(TrainerBase):
                 self.writer.add_scalar("LR/encoder", param_group["lr"])
             elif i == 1:
                 self.writer.add_scalar("LR/decoder", param_group["lr"])
+        self.writer.add_scalar("weight/bce", self.loss.bce_weight)
 
         loss_mtrs = [AverageMeter(loss) for loss in ["loss", "bce", "dice", "lovasz"]]
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]

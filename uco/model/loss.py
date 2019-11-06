@@ -10,15 +10,44 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.modules.loss import _Loss
 from torch.autograd import Variable
 
-
-def bce_loss(output, target):
-    return F.binary_cross_entropy_with_logits(output, target)
+from .scheduler import rolloff
 
 
-class DiceLoss(nn.Module):
+class UpdatableLoss(nn.Module):
+    def set_epoch(self, epoch):
+        pass
+
+
+class AnnealingLoss(UpdatableLoss):
+    def __init__(self, start_weight, end_weight, start_anneal, anneal_epochs):
+        super().__init__()
+        self.start_weight = start_weight
+        self.end_weight = end_weight
+        self.start_anneal = start_anneal
+        self.anneal_epochs = anneal_epochs
+        self.curve = self.get_curve(start_weight, end_weight, anneal_epochs)
+
+    def get_curve(self, start_weight, end_weight, anneal_epochs):
+        curve = rolloff(
+            anneal_epochs,
+            loc_factor=0.5,
+            scale_factor=0.1,
+            magnitude=start_weight - end_weight,
+            offset=end_weight,
+        )
+        return curve
+
+    def get_weight_for_epoch(self, epoch):
+        if epoch < self.start_anneal:
+            return self.start_weight
+        if epoch < self.start_anneal + self.anneal_epochs:
+            return self.start_weight * self.curve[epoch - self.start_anneal]
+        return self.end_weight
+
+
+class DiceLoss(UpdatableLoss):
     def __init__(self, eps: float = 1e-7, threshold: float = None, soften: float = 0):
         super().__init__()
         self.loss_fn = partial(dice, eps=eps, threshold=threshold, soften=soften)
@@ -28,7 +57,7 @@ class DiceLoss(nn.Module):
         return 1 - dice
 
 
-class BCEDiceLoss(nn.Module):
+class BCEDiceLoss(UpdatableLoss):
     def __init__(
         self,
         eps: float = 1e-7,
@@ -66,7 +95,7 @@ class BCEDiceLoss(nn.Module):
         return {"loss": loss, "bce": bce, "dice": dice}
 
 
-class BCELovaszLoss(nn.Module):
+class BCELovaszLoss(UpdatableLoss):
     def __init__(
         self, bce_weight: float = 0.5, lovasz_weight: float = 0.5, per_image=True
     ):
@@ -99,24 +128,45 @@ class BCELovaszLoss(nn.Module):
         return {"loss": loss, "bce": bce, "lovasz": lovasz}
 
 
-class SlidingBCEDiceLoss(BCEDiceLoss):
+class AnnealingBCELovaszLoss(AnnealingLoss):
+    """
+    Mixed loss than decays the weight of BCE as training progresses.
+    """
+
     def __init__(
         self,
-        dice_step: float = 0.01,
-        eps: float = 1e-7,
-        threshold: float = None,
         bce_weight: float = 0.5,
-        dice_weight: float = 0.5,
+        lovasz_weight: float = 0.5,
+        per_image: bool = True,
+        end_weight: float = 0.5,
+        start_anneal: int = 0,
+        anneal_epochs: int = 0,
     ):
-        self.dice_step = dice_step
-        super().__init(eps, threshold, bce_weight, dice_weight)
+        super().__init__(bce_weight, end_weight, start_anneal, anneal_epochs)
+        self.bce_weight = bce_weight
+        self.lovasz_weight = lovasz_weight
+        if self.bce_weight != 0:
+            self.bce_loss = nn.BCEWithLogitsLoss()
+        if self.lovasz_weight != 0:
+            self.lovasz_loss = LovaszLoss(per_image=per_image)
 
-    def step(self):
-        self.dice_weight += self.dice_step
-        self.bce_weight = 1 - self.dice_weight
+    def set_epoch(self, epoch):
+        self.bce_weight = self.get_weight_for_epoch(epoch)
+        self.lovasz_weight = 1 - self.bce_weight
+
+    def forward(self, outputs, targets):
+        if self.bce_weight == 0:
+            return self.dice_weight * self.lovasz_loss(outputs, targets)
+        if self.lovasz_weight == 0:
+            return self.bce_weight * self.bce_loss(outputs, targets)
+
+        bce = self.bce_loss(outputs, targets)
+        lovasz = self.lovasz_loss(outputs, targets)
+        loss = self.bce_weight * bce + self.lovasz_weight * lovasz
+        return {"loss": loss, "bce": bce, "lovasz": lovasz}
 
 
-class IoULoss(nn.Module):
+class IoULoss(UpdatableLoss):
     """
     Intersection over union (Jaccard) loss
     Args:
@@ -135,7 +185,7 @@ class IoULoss(nn.Module):
         return 1 - iou
 
 
-class BinaryFocalLoss(_Loss):
+class BinaryFocalLoss(UpdatableLoss):
     def __init__(
         self,
         alpha=0.5,

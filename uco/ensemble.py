@@ -96,13 +96,13 @@ class SeedOptions(ConfigOptionBase):
 class LossOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
-        bce_weights = [0.65, 0.70, 0.75]
+        bce_weights = [0.75, 0.80, 0.85]
         opts = []
         for bce_weight in bce_weights:
             opts.append(
                 {
-                    "type": "BCEDiceLoss",
-                    "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
+                    "type": "BCELovaszLoss",
+                    "args": {"bce_weight": bce_weight, "lovasz_weight": 1 - bce_weight},
                 }
             )
         return opts
@@ -140,54 +140,14 @@ class ModelOptions(ConfigOptionBase):
         transforms = str(
             np.random.choice(
                 [
-                    # "LightTransforms",
                     "CutoutTransforms",
                     "DistortionTransforms",
                     "CutoutDistortionTransforms",
-                    # "HeavyResizeTransforms",
                 ]
             )
         )
         return [
-            # unet - inceptionv4
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "inceptionv4", "dropout": dropout},
-                "batch_size": 24,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 256, "width": 384},
-                },
-            },
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "inceptionv4", "dropout": dropout},
-                "batch_size": 16,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 320, "width": 480},
-                },
-            },
-            # unet - inceptionresnetv2
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "inceptionresnetv2", "dropout": dropout},
-                "batch_size": 20,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 256, "width": 384},
-                },
-            },
             # unet - efficientnet-b0
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
-                "batch_size": 32,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 256, "width": 384},
-                },
-            },
             {
                 "type": "Unet",
                 "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
@@ -224,50 +184,10 @@ class ModelOptions(ConfigOptionBase):
                     "dropout": dropout,
                     "decoder_merge_policy": "cat",
                 },
-                "batch_size": 28,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 256, "width": 384},
-                },
-            },
-            {
-                "type": "FPN",
-                "args": {
-                    "encoder_name": "efficientnet-b2",
-                    "dropout": dropout,
-                    "decoder_merge_policy": "cat",
-                },
                 "batch_size": 16,
                 "augmentation": {
                     "type": transforms,
                     "args": {"height": 320, "width": 480},
-                },
-            },
-            # fpn - efficientnet-b0
-            {
-                "type": "FPN",
-                "args": {
-                    "encoder_name": "efficientnet-b0",
-                    "dropout": dropout,
-                    "decoder_merge_policy": "cat",
-                },
-                "batch_size": 24,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 320, "width": 480},
-                },
-            },
-            {
-                "type": "FPN",
-                "args": {
-                    "encoder_name": "efficientnet-b0",
-                    "dropout": dropout,
-                    "decoder_merge_policy": "cat",
-                },
-                "batch_size": 16,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 384, "width": 576},
                 },
             },
         ]
