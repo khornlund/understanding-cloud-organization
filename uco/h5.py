@@ -97,7 +97,7 @@ class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
     min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
+    top_thresholds = np.array([0.57, 0.70, 0.57, 0.70])
     bot_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
 
     def __init__(self, verbose=2):

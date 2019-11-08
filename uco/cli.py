@@ -1,5 +1,9 @@
+import shutil
+
 import click
+import torch
 from pathlib import Path
+from tqdm import tqdm
 
 from uco.ensemble import EnsembleManager
 from uco.runner import TrainingManager, InferenceManager
@@ -143,3 +147,29 @@ def post_process(config_filename):
 @click.option("-n", "--name", type=str, required=True)
 def submit(filename, name):
     kaggle_submit(filename, name)
+
+
+@cli.command()
+@click.option(
+    "-f",
+    "--folder",
+    type=str,
+    default="saved/training",
+    help="Folder containing checkpoints",
+)
+@click.option("-s", "--score-cutoff", default=0.60, help="delete runs with low scores")
+def prune(folder, score_cutoff):
+    checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))[:-2]
+    counter = 0
+    for c in tqdm(checkpoints):
+        try:
+            state_dict = torch.load(c, map_location=torch.device("cpu"))
+            if state_dict["monitor_best"] < score_cutoff:
+                parent = c.parent.parent
+                if "training" in parent.name:  # safety
+                    raise Exception("About to delete training directory!")
+                shutil.rmtree(parent)
+                counter += 1
+        except Exception as ex:
+            print(f"Caught exception for {c}: {ex}")
+    print(f"Deleted {counter}/{len(checkpoints)} checkpoints")

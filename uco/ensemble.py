@@ -7,6 +7,9 @@ from uco.runner import TrainingManager, InferenceManager
 from uco.utils import setup_logger, setup_logging, load_config, seed_everything, Indexer
 
 
+GPU = 11  # RTX 2080Ti
+
+
 class EnsembleManager:
     def __init__(self, infer_config):
         self.infer_config = infer_config
@@ -146,51 +149,138 @@ class ModelOptions(ConfigOptionBase):
                 ]
             )
         )
-        return [
-            # unet - efficientnet-b0
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
-                "batch_size": 20,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 320, "width": 480},
+        return (
+            [
+                # unet - efficientnet-b0
+                {
+                    "type": "Unet",
+                    "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                    "batch_size": 20,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
                 },
-            },
-            # unet - efficientnet-b2
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                "batch_size": 24,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 256, "width": 384},
+                # unet - efficientnet-b2
+                {
+                    "type": "Unet",
+                    "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                    "batch_size": 24,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 256, "width": 384},
+                    },
                 },
-            },
-            {
-                "type": "Unet",
-                "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                "batch_size": 16,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 320, "width": 480},
+                {
+                    "type": "Unet",
+                    "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                    "batch_size": 16,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
                 },
-            },
-            # fpn - efficientnet-b2
-            {
-                "type": "FPN",
-                "args": {
-                    "encoder_name": "efficientnet-b2",
-                    "dropout": dropout,
-                    "decoder_merge_policy": "cat",
+                # fpn - efficientnet-b2
+                {
+                    "type": "FPN",
+                    "args": {
+                        "encoder_name": "efficientnet-b2",
+                        "dropout": dropout,
+                        "decoder_merge_policy": "cat",
+                    },
+                    "batch_size": 16,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
                 },
-                "batch_size": 16,
-                "augmentation": {
-                    "type": transforms,
-                    "args": {"height": 320, "width": 480},
+            ]
+            if GPU == 11
+            else [
+                # unet - efficientnet-b5
+                {
+                    "type": "Unet",
+                    "args": {
+                        "encoder_name": "efficientnet-b5",
+                        # "dropout": dropout
+                    },
+                    "batch_size": 10,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
                 },
-            },
-        ]
+                # unet - resnext101_32x8d
+                {
+                    "type": "Unet",
+                    "args": {
+                        "encoder_name": "resnext101_32x8d",
+                        # "dropout": dropout
+                    },
+                    "batch_size": 12,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                {
+                    "type": "Unet",
+                    "args": {
+                        "encoder_name": "resnext101_32x8d",
+                        # "dropout": dropout,
+                        "encoder_weights": "instagram",
+                    },
+                    "batch_size": 12,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                # fpn - efficientnet-b5
+                {
+                    "type": "FPN",
+                    "args": {
+                        "encoder_name": "efficientnet-b5",
+                        "dropout": dropout,
+                        "decoder_merge_policy": "cat",
+                    },
+                    "batch_size": 12,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                # fpn - resnext101_32x8d
+                {
+                    "type": "FPN",
+                    "args": {
+                        "encoder_name": "resnext101_32x8d",
+                        "dropout": dropout,
+                        "decoder_merge_policy": "cat",
+                    },
+                    "batch_size": 14,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                {
+                    "type": "FPN",
+                    "args": {
+                        "encoder_name": "resnext101_32x8d",
+                        "dropout": dropout,
+                        "decoder_merge_policy": "cat",
+                        "encoder_weights": "instagram",
+                    },
+                    "batch_size": 14,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                # fpn - se_resnext101_32x4d
+            ]
+        )
 
     @classmethod
     def update(cls, config):
