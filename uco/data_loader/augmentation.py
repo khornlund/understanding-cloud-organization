@@ -78,7 +78,7 @@ class RandomResizeCropBase(NormalizeBase):
         width,
         scale_rrc=(0.7, 1),
         ratio=(0.75, 1.33),
-        scale_ssr=0.3,
+        scale_ssr=0.5,
         rotate=10,
     ):
         self.h = height
