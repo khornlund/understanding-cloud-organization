@@ -1,9 +1,10 @@
 name: inference
 save_dir: saved/
 seed: 1234
-target_devices: [0]
+device: 1
 verbose: 2
 tensorboard: false
+run_inference: true
 
 data_loader:
   type: CloudSegTestDataLoader
@@ -14,5 +15,7 @@ data_loader:
     pin_memory: true
 
 output:
-  h5: data/predictions/raw-predictions.h5
+  raw: data/predictions/raw-predictions.h5
+  avg: data/predictions/avg-predictions.h5
+  sub: data/predictions/submission.csv
   log: data/predictions/log.csv

@@ -34,7 +34,7 @@ class Indexer:
         index_filename = parent / cls.index_filename
         try:
             df = pd.read_csv(index_filename)
-            df.append(config, ignore_index=True)
+            df = df.append(config, ignore_index=True)
         except FileNotFoundError:
             df = pd.DataFrame.from_records([config])
         df.sort_values("run", inplace=True)
@@ -54,7 +54,7 @@ class Indexer:
             "run": run_dir.name,
             "encoder": train_cfg["arch"]["args"]["encoder_name"],
             "decoder": train_cfg["arch"]["type"],
-            "dropout": train_cfg["arch"]["args"]["dropout"],
+            "dropout": train_cfg["arch"]["args"].get("dropout", 0),
             "augs": train_cfg["augmentation"]["type"],
             "img_height": train_cfg["augmentation"]["args"]["height"],
             "img_width": train_cfg["augmentation"]["args"]["width"],
@@ -65,7 +65,9 @@ class Indexer:
             "optimizer": train_cfg["optimizer"]["type"],
             "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
             "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
+            "anneal_start": train_cfg["lr_scheduler"]["args"]["start_anneal"],
+            "anneal_end": train_cfg["lr_scheduler"]["args"]["n_epochs"],
+            "encoder_weights": train_cfg["arch"]["args"]["encoder_weights"],
             "seed": train_cfg["seed"],
         }
-
         return settings

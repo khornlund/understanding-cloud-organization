@@ -97,7 +97,11 @@ class BCEDiceLoss(UpdatableLoss):
 
 class BCELovaszLoss(UpdatableLoss):
     def __init__(
-        self, bce_weight: float = 0.5, lovasz_weight: float = 0.5, per_image=True
+        self,
+        bce_weight: float = 0.5,
+        lovasz_weight: float = 0.5,
+        per_image=True,
+        per_class=False,
     ):
         super().__init__()
 
@@ -114,7 +118,7 @@ class BCELovaszLoss(UpdatableLoss):
             self.bce_loss = nn.BCEWithLogitsLoss()
 
         if self.lovasz_weight != 0:
-            self.lovasz_loss = LovaszLoss(per_image=per_image)
+            self.lovasz_loss = LovaszLoss(per_image=per_image, per_class=per_class)
 
     def forward(self, outputs, targets):
         if self.bce_weight == 0:
@@ -185,75 +189,6 @@ class IoULoss(UpdatableLoss):
         return 1 - iou
 
 
-class BinaryFocalLoss(UpdatableLoss):
-    def __init__(
-        self,
-        alpha=0.5,
-        gamma=2,
-        ignore_index=None,
-        reduction="mean",
-        reduced=False,
-        threshold=0.5,
-    ):
-        """
-        :param alpha:
-        :param gamma:
-        :param ignore_index:
-        :param reduced:
-        :param threshold:
-        """
-        super().__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-        self.ignore_index = ignore_index
-        if reduced:
-            self.focal_loss = partial(
-                focal_loss_with_logits,
-                alpha=None,
-                gamma=gamma,
-                threshold=threshold,
-                reduction=reduction,
-            )
-        else:
-            self.focal_loss = partial(
-                focal_loss_with_logits, alpha=alpha, gamma=gamma, reduction=reduction
-            )
-
-    def forward(self, label_input, label_target):
-        """Compute focal loss for binary classification problem.
-        """
-        label_target = label_target.view(-1)
-        label_input = label_input.view(-1)
-
-        if self.ignore_index is not None:
-            # Filter predictions with ignore label from loss computation
-            not_ignored = label_target != self.ignore_index
-            label_input = label_input[not_ignored]
-            label_target = label_target[not_ignored]
-
-        loss = self.focal_loss(label_input, label_target)
-        return loss
-
-
-class FocalBCEDiceLoss(BCEDiceLoss):
-    def __init__(
-        self,
-        alpha=0.5,
-        gamma=2,
-        ignore_index=None,
-        reduction="mean",
-        reduced=False,
-        eps: float = 1e-7,
-        threshold: float = None,
-        bce_weight: float = 0.5,
-        dice_weight: float = 0.5,
-    ):
-        super().__init__(eps, threshold, bce_weight, dice_weight)
-        self.bce_loss = BinaryFocalLoss(
-            alpha, gamma, ignore_index, reduction, reduced, threshold
-        )
-
-
 # -- Lovasz Loss ----------------------------------------------------------------------
 
 """
@@ -322,11 +257,17 @@ def iou(preds, labels, C, EMPTY=1.0, ignore=None, per_image=False):
 
 
 class LovaszLoss(nn.Module):
-    def __init__(self, per_image: bool = True, ignore: bool = None):
+    def __init__(
+        self, per_image: bool = True, per_class: bool = True, ignore: bool = None
+    ):
         super().__init__()
+        self.per_class = per_class
         self.loss = partial(lovasz_hinge, per_image=per_image, ignore=ignore)
 
     def forward(self, outputs, targets):
+        if not self.per_class:
+            return self.loss(outputs, targets)
+
         B, C, H, W = outputs.size()
         per_class_losses = torch.stack(
             [
@@ -392,35 +333,6 @@ def flatten_binary_scores(scores, labels, ignore=None):
     return vscores, vlabels
 
 
-class StableBCELoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, input, target):
-        neg_abs = -input.abs()
-        loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
-        return loss.mean()
-
-
-def binary_xloss(logits, labels, ignore=None):
-    r"""
-    Binary Cross entropy loss
-      logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
-      labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
-      ignore: void class id
-    """
-    logits, labels = flatten_binary_scores(logits, labels, ignore)
-    loss = StableBCELoss()(logits, Variable(labels.float()))
-    return loss
-
-
-def xloss(logits, labels, ignore=None):
-    """
-    Cross entropy loss
-    """
-    return F.cross_entropy(logits, Variable(labels), ignore_index=255)
-
-
 # -- utils ----------------------------------------------------------------------------
 
 
@@ -452,53 +364,6 @@ def dice(
     union = torch.sum(targets) + torch.sum(outputs)
     dice = (2 * intersection + soften) / (union + eps + soften)
     return dice
-
-
-def focal_loss_with_logits(
-    input: torch.Tensor,
-    target: torch.Tensor,
-    gamma=2.0,
-    alpha: float = 0.25,
-    reduction="mean",
-    normalized=False,
-    threshold: float = None,
-) -> torch.Tensor:
-    """
-    https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/losses/functional.py
-    Compute binary focal loss between target and output logits.
-    See :class:`~pytorch_toolbelt.losses.FocalLoss` for details.
-    References::
-        https://github.com/open-mmlab/mmdetection/blob/master/mmdet/core/loss/losses.py
-    """
-    target = target.type(input.type())
-
-    logpt = -F.binary_cross_entropy_with_logits(input, target, reduction="none")
-    pt = torch.exp(logpt)
-
-    # compute the loss
-    if threshold is None:
-        focal_term = (1 - pt).pow(gamma)
-    else:
-        focal_term = ((1.0 - pt) / threshold).pow(gamma)
-        focal_term[pt < threshold] = 1
-
-    loss = -focal_term * logpt
-
-    if alpha is not None:
-        loss = loss * (alpha * target + (1 - alpha) * (1 - target))
-
-    if normalized:
-        norm_factor = focal_term.sum()
-        loss = loss / norm_factor
-
-    if reduction == "mean":
-        loss = loss.mean()
-    if reduction == "sum":
-        loss = loss.sum()
-    if reduction == "batchwise_mean":
-        loss = loss.sum(0)
-
-    return loss
 
 
 def isnan(x):

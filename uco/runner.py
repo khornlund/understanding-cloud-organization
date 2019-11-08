@@ -17,7 +17,8 @@ import uco.model.metric as module_metric
 import uco.model.model as module_arch
 from uco.trainer import Trainer
 from uco.utils import setup_logger, setup_logging, TensorboardWriter, seed_everything
-from uco.h5 import HDF5PredictionWriter
+
+from .h5 import HDF5PredictionWriter
 
 
 class ManagerBase:
@@ -225,13 +226,13 @@ class InferenceManager(ManagerBase):
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()
         device = self.setup_device(cfg["device"])
+        torch.cuda.set_device(device)
         checkpoint = self.load_checkpoint(model_checkpoint, device)
         if not self.check_score(checkpoint):
             return
         train_cfg = checkpoint["config"]
 
         model = self.get_instance(module_arch, "arch", train_cfg)
-        model.to(device)
         model.load_state_dict(checkpoint["state_dict"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
@@ -240,12 +241,13 @@ class InferenceManager(ManagerBase):
             tta.Compose([tta.HorizontalFlip(), tta.VerticalFlip()]),
             merge_mode="mean",
         )
+        tta_model.to(device)
 
         transforms = self.get_instance(module_aug, "augmentation", train_cfg)
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
 
         timestamp = Path(model_checkpoint).parent.parent.name
-        rw = HDF5PredictionWriter(filename=cfg["output"]["h5"], dataset=str(timestamp))
+        rw = HDF5PredictionWriter(filename=cfg["output"]["raw"], dataset=timestamp)
         writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
         writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
         self.logger.info("Performing inference")

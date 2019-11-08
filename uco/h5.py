@@ -8,7 +8,7 @@ from tqdm import tqdm
 import albumentations as A
 
 from uco.data_loader import RLEOutput
-from uco.utils import setup_logger, setup_logging
+from uco.utils import setup_logger
 
 
 class HDF5ReaderWriterBase:
@@ -64,48 +64,71 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
         return f'Wrote {self.counter} predictions to "{self.filename}" /{self.dataset}'
 
 
-class HDF5PredictionReducer(HDF5ReaderWriterBase):
+class HDF5AverageWriter(HDF5ReaderWriterBase):
     """
-    Handles averaging a set of predictions.
+    Handles averaging a set of predictions, and saving the result to HDF5.
     """
 
-    sample_csv = "sample_submission.csv"
-    # min_sizes = np.array([9573, 9670, 9019, 7885])
-    min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.60, 0.60, 0.60, 0.60])
-    bot_thresholds = np.array([0.5, 0.5, 0.5, 0.5])
+    dataset_name = "average"
 
     def __init__(self, verbose=2):
-        setup_logging({"save_dir": "saved", "name": "inference"})
         self.logger = setup_logger(self, verbose)
 
-    def average(self, predictions_filename, data_dir, reduced_filename):
-        self.logger.info(f'Reducing: "{predictions_filename}"')
-        data_dir = Path(data_dir)
-        sample_df = pd.read_csv(data_dir / self.sample_csv)
+    def average(self, pred_filename, avg_filename):
+        self.logger.info(f'Reducing: "{pred_filename}" to "{avg_filename}"')
+        with h5py.File(pred_filename, "r") as src, h5py.File(avg_filename, "w") as dst:
+            n_predictions = sum([1 for _ in src.keys()])
+            self.logger.info(f"Averaging {n_predictions} predictions")
+
+            dset = dst.create_dataset(
+                self.dataset_name, (self.N, self.C, self.H, self.W), dtype="float32"
+            )
+
+            for n in tqdm(range(self.N), total=self.N):
+                pred_stack = np.stack([src[k][n, :, :, :] for k in src.keys()], axis=0)
+                pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
+                # TODO: std calculation?
+                dset[n, :, :, :] = pred_mean
+
+        self.logger.info(f"Averaging complete.")
+
+
+class PostProcessor(HDF5ReaderWriterBase):
+
+    sample_csv = "sample_submission.csv"
+    min_sizes = np.array([9573, 9670, 9019, 7885])
+    top_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
+    bot_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
+
+    def __init__(self, verbose=2):
+        self.logger = setup_logger(self, verbose)
+
+    def process(self, avg_filename, data_dir, submission_filename):
+        self.logger.info(f'PostProcessing: "{avg_filename}"')
+        self.logger.info(f"min_sizes: {self.min_sizes}")
+        self.logger.info(f"top_thresholds: {self.top_thresholds}")
+        self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
+        sample_df = pd.read_csv(Path(data_dir) / self.sample_csv)
+
         throwaway_counter = np.array([0, 0, 0, 0])
         positive_counter = np.array([0, 0, 0, 0])
-        with h5py.File(predictions_filename, "r") as f:
-            n_predictions = sum([1 for _ in f.keys()])
-            self.logger.info(f"Averaging {n_predictions} predictions")
+        dset_name = HDF5AverageWriter.dataset_name
+
+        with h5py.File(avg_filename, "r") as f:
             for n in tqdm(range(self.N), total=self.N):
-                pred_stack = np.stack([f[k][n, :, :, :] for k in f.keys()], axis=0)
-                pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
-                rles, throwaways = self.process(pred_mean)
+                pred_mean = f[dset_name][n, :, :, :]
+                rles, throwaways = self.threshold(pred_mean)
                 throwaway_counter += throwaways
                 for c, rle in enumerate(rles):
                     if rle != "":
                         positive_counter[c] += 1
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
-        pseudo_csv = data_dir / "pseudo.csv"
-        submission_csv = Path(predictions_filename).parent / reduced_filename
-        sample_df.to_csv(pseudo_csv, index=False)
-        sample_df.to_csv(submission_csv, index=False)
+        sample_df.to_csv(submission_filename, index=False)
         self.logger.info(f"Threw away {throwaway_counter} predictions under min size")
         self.logger.info(f"Positive predictions: {positive_counter}")
-        self.logger.info(f'saved predictions to "{pseudo_csv}" and "{submission_csv}"')
+        self.logger.info(f'saved predictions to "{submission_filename}"')
 
-    def process(self, predictions):
+    def threshold(self, predictions):
         """
         Post process predictions by applying triplet-threshold.
         """
