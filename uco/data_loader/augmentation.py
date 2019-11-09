@@ -116,29 +116,18 @@ class RandomResizeCropBase(NormalizeBase):
         )
 
 
-def CutoutBase(height, width):
+def CutoutBase(height, width, mask=False):
+    aug = DualCoarseDropout if mask else A.CoarseDropout
     return A.Compose(
         [
-            A.OneOf(
-                [
-                    DualCoarseDropout(
-                        max_holes=1,
-                        min_height=height // 4,
-                        max_height=height // 2,
-                        min_width=width // 4,
-                        max_width=width // 2,
-                        p=1,
-                    ),
-                    DualCoarseDropout(
-                        max_holes=4,
-                        min_height=height // 8,
-                        max_height=height // 4,
-                        min_width=width // 8,
-                        max_width=width // 4,
-                        p=1,
-                    ),
-                ],
-                p=0.2,
+            aug(
+                min_holes=1,
+                max_holes=4,
+                min_height=height // 8,
+                max_height=height // 4,
+                min_width=height // 8,
+                max_width=height // 4,
+                p=0.5,
             )
         ]
     )
@@ -184,6 +173,8 @@ class CutoutTransforms(RandomResizeCropBase):
     """
     """
 
+    cutout_mask = True
+
     def build_train(self):
         return A.Compose(
             [
@@ -191,11 +182,18 @@ class CutoutTransforms(RandomResizeCropBase):
                 A.Flip(p=0.6),
                 A.RandomBrightness(),
                 A.RandomContrast(),
-                CutoutBase(self.h, self.w),
+                CutoutBase(self.h, self.w, mask=self.cutout_mask),
                 A.Normalize(self.MEANS, self.STDS),
                 ToTensorV2(),
             ]
         )
+
+
+class CutoutImgOnlyTransforms(CutoutTransforms):
+    """
+    """
+
+    cutout_mask = False
 
 
 class DistortionTransforms(RandomResizeCropBase):

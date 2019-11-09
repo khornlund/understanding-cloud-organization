@@ -5,6 +5,7 @@ import torch
 from pathlib import Path
 from tqdm import tqdm
 
+from uco.data_loader import PseudoLabelBuilder
 from uco.ensemble import EnsembleManager
 from uco.runner import TrainingManager, InferenceManager
 from uco.h5 import HDF5AverageWriter, PostProcessor
@@ -173,3 +174,12 @@ def prune(folder, score_cutoff):
         except Exception as ex:
             print(f"Caught exception for {c}: {ex}")
     print(f"Deleted {counter}/{len(checkpoints)} checkpoints")
+
+
+@cli.command()
+@click.option(
+    "-s", "--submission-filename", type=str, default="data/predictions/submission.csv"
+)
+@click.option("-d", "--data-directory", type=str, default="data/raw")
+def create_pseudo(submission_filename, data_directory):
+    PseudoLabelBuilder.build(submission_filename, data_directory)

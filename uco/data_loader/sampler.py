@@ -25,7 +25,7 @@ class SamplerFactory:
             The number of pseudo-labelled samples to include in each batch.
         """
         self.logger.info(
-            f"Creating `{WeightedFixedBatchSampler.__class__.__name__}`..."
+            f"Creating `{str(WeightedFixedBatchSampler.__class__.__name__)}`..."
         )
         ground_truth_per_batch = batch_size - n_pseudo_per_batch
         n_ground_truth = len(class_idxs[0])
