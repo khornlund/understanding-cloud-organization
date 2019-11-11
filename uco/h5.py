@@ -24,20 +24,18 @@ class HDF5PredictionWriter(HDF5ReaderWriterBase):
     Handles writing prediction output to HDF5 by rounding to scaled uint8.
     """
 
-    def __init__(self, filename, dataset):
+    def __init__(self, filename, dataset, mean_dice):
         self.filename = Path(filename)
         self.dataset = dataset
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         self.f = h5py.File(self.filename, "a")
         try:
             self.dset = self.f.create_dataset(
-                self.dataset,
-                (self.N, self.C, self.H, self.W),
-                dtype="uint8",
-                # dtype='float32'
+                self.dataset, (self.N, self.C, self.H, self.W), dtype="uint8"
             )
         except Exception as _:  # noqa
             self.dset = self.f[self.dataset]
+        self.dset.attrs["mean_dice"] = mean_dice
         self.counter = 0
         self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)
 
@@ -86,7 +84,7 @@ class HDF5AverageWriter(HDF5ReaderWriterBase):
 
             for n in tqdm(range(self.N), total=self.N):
                 pred_stack = np.stack([src[k][n, :, :, :] for k in src.keys()], axis=0)
-                pred_mean = pred_stack.mean(axis=0) / 100  # undo scaling
+                pred_mean = np.mean(pred_stack, axis=0) / 100  # undo scaling
                 # TODO: std calculation?
                 dset[n, :, :, :] = pred_mean
 
@@ -97,7 +95,7 @@ class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
     min_sizes = np.array([9573, 9670, 9019, 7885])
-    top_thresholds = np.array([0.57, 0.57, 0.57, 0.57])
+    top_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
     bot_thresholds = np.array([0.45, 0.45, 0.45, 0.45])
 
     def __init__(self, verbose=2):

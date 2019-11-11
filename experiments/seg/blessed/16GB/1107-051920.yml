@@ -1,35 +1,35 @@
-mean_dice: 0.617239
+mean_dice: 0.614134
 arch:
   args:
     activation: null
     classes: 4
-    dropout: 0.2
-    encoder_name: efficientnet-b2
-    encoder_weights: imagenet
+    decoder_merge_policy: cat
+    dropout: 0.15
+    encoder_name: resnext101_32x8d
+    encoder_weights: instagram
     in_channels: 3
-  type: Unet
+  type: FPN
 augmentation:
   args:
     height: 320
     width: 480
-  type: HeavyResizeTransforms
+  type: CutoutDistortionTransforms
 data_loader:
   args:
-    batch_size: 16
+    batch_size: 14
     data_dir: data/raw/
-    nworkers: 12
+    nworkers: 8
     shuffle: true
     validation_split: 0.2
   type: CloudSegDataLoader
 loss:
   args:
-    bce_weight: 0.7
-    dice_weight: 0.30000000000000004
-    smooth: 0.001
-  type: SmoothBCEDiceLoss
+    bce_weight: 0.85
+    lovasz_weight: 0.15000000000000002
+  type: BCELovaszLoss
 lr_scheduler:
   args:
-    n_epochs: 44
+    n_epochs: 16
     start_anneal: 1
   type: CosineAnnealingScheduler
 metrics:
@@ -38,26 +38,25 @@ metrics:
 - dice_2
 - dice_3
 - dice_mean
-name: sever-Unet-efficientnet-b2-SmoothBCEDiceLoss
 optimizer:
   args:
     lr: 0.001
     weight_decay: 0.0002
   decoder:
-    lr: 0.003
+    lr: 0.004
     weight_decay: 0.0003
   encoder:
-    lr: 7.0e-05
+    lr: 9.0e-05
     weight_decay: 3.0e-05
-  type: RAdam
+  type: QHAdamW
 save_dir: saved/
-seed: 2985467
+seed: 64971376
 short_name: sever
 target_devices:
 - 0
 training:
-  early_stop: 3
-  epochs: 60
+  early_stop: 4
+  epochs: 15
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1

@@ -107,9 +107,9 @@ class TrainingManager(ManagerBase):
         model, device = self.setup_device(model, cfg["target_devices"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
-        param_groups = self.setup_param_groups(model, cfg["optimizer"])
+        param_groups = self.setup_param_groups_segmentation(model, cfg["optimizer"])
+        # param_groups = self.setup_param_groups_classifier(model, cfg["optimizer"])
         optimizer = self.get_instance(module_optimizer, "optimizer", cfg, param_groups)
-        # optimizer = module_optimizer.Lookahead(optimizer)
         lr_scheduler = self.get_instance(
             module_scheduler, "lr_scheduler", cfg, optimizer
         )
@@ -147,7 +147,7 @@ class TrainingManager(ManagerBase):
         self.logger.info("Training completed.")
         return checkpoint_dir
 
-    def setup_param_groups(self, model: nn.Module, config: dict) -> dict:
+    def setup_param_groups_segmentation(self, model: nn.Module, config: dict) -> dict:
         """
         Helper to remove weight decay from bias parameters.
         """
@@ -179,16 +179,30 @@ class TrainingManager(ManagerBase):
         params = [
             {"params": encoder_weight_params, **encoder_opts},
             {"params": decoder_weight_params, **decoder_opts},
-            {
-                "params": encoder_bias_params,
-                "lr": encoder_opts["lr"],
-                "weight_decay": encoder_opts["weight_decay"],
-            },
-            {
-                "params": decoder_bias_params,
-                "lr": decoder_opts["lr"],
-                "weight_decay": decoder_opts["weight_decay"],
-            },
+            {"params": encoder_bias_params, "lr": encoder_opts["lr"]},
+            {"params": decoder_bias_params, "lr": decoder_opts["lr"]},
+        ]
+        return params
+
+    def setup_param_groups_classifier(self, model: nn.Module, config: dict) -> dict:
+        """
+        Helper to remove weight decay from bias parameters.
+        """
+        weight_params = []
+        bias_params = []
+
+        for name, param in model.named_parameters():
+            if name.endswith("bias"):
+                bias_params.append(param)
+            else:
+                weight_params.append(param)
+
+        self.logger.info(f"Found {len(weight_params)} weight params")
+        self.logger.info(f"Found {len(bias_params)} bias params")
+
+        params = [
+            {"params": weight_params, **config},
+            {"params": bias_params, "lr": config["lr"]},
         ]
         return params
 
@@ -221,7 +235,7 @@ class InferenceManager(ManagerBase):
     Top level class to perform inference.
     """
 
-    SCORE_THRESHOLD = 0.610
+    SCORE_THRESHOLD = 0.605
 
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()
@@ -247,7 +261,11 @@ class InferenceManager(ManagerBase):
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
 
         timestamp = Path(model_checkpoint).parent.parent.name
-        rw = HDF5PredictionWriter(filename=cfg["output"]["raw"], dataset=timestamp)
+        rw = HDF5PredictionWriter(
+            filename=cfg["output"]["raw"],
+            dataset=timestamp,
+            mean_dice=checkpoint["monitor_best"].item(),
+        )
         writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
         writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
         self.logger.info("Performing inference")

@@ -1,0 +1,65 @@
+mean_dice: 0.606347
+arch:
+  args:
+    activation: null
+    classes: 4
+    dropout: 0.1
+    encoder_name: efficientnet-b5
+    encoder_weights: imagenet
+    in_channels: 3
+  type: Unet
+augmentation:
+  args:
+    height: 320
+    width: 480
+  type: CutoutTransforms
+data_loader:
+  args:
+    batch_size: 10
+    data_dir: data/raw/
+    nworkers: 8
+    shuffle: true
+    validation_split: 0.2
+  type: CloudSegDataLoader
+loss:
+  args:
+    bce_weight: 0.75
+    dice_weight: 0.25
+  type: BCEDiceLoss
+lr_scheduler:
+  args:
+    n_epochs: 16
+    start_anneal: 1
+  type: CosineAnnealingScheduler
+metrics:
+- dice_0
+- dice_1
+- dice_2
+- dice_3
+- dice_mean
+optimizer:
+  args:
+    lr: 0.001
+    weight_decay: 0.0002
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
+  encoder:
+    lr: 9.0e-05
+    weight_decay: 3.0e-05
+  type: QHAdamW
+save_dir: saved/
+seed: 47775875
+short_name: sever
+target_devices:
+- 0
+training:
+  early_stop: 3
+  epochs: 15
+  monitor: max val_dice_mean
+  save_period: 1
+  start_val_epoch: 1
+  tensorboard: true
+  unfreeze_encoder: 0
+  verbose: 2
+verbose: 2

@@ -1,60 +1,59 @@
 short_name: sever
-save_dir: saved/
+save_dir: saved/clas
 verbose: 2
-seed: 1234
+seed: 12145
 target_devices: [0]
 
 arch:
+  type: EfficientNet
   args:
-    encoder_weights: imagenet
-    activation: null
+    model_name: efficientnet-b0
     classes: 4
-    in_channels: 3
+
+augmentation:
+  type: CutoutDistortionTransforms
+  args:
+    height: 320
+    width: 480
 
 data_loader:
-  type: CloudSegDataLoader
+  type: CloudClasDataLoader
   args:
-    # batch_size: 16
+    batch_size: 20
     data_dir: data/raw/
     nworkers: 8
     shuffle: true
     validation_split: 0.2
 
 loss:
-  type: SmoothBCEDiceLoss
-  args:
-    bce_weight: 0.6
-    dice_weight: 0.4
-    smooth: 1.0e-6
+  type: BCELoss
+  args: {}
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 26
-    start_anneal: 2
+    n_epochs: 31
+    start_anneal: 1
 
 metrics:
-- dice_0
-- dice_1
-- dice_2
-- dice_3
-- dice_mean
+- precision_0
+- precision_1
+- precision_2
+- precision_3
+- recall_0
+- recall_1
+- recall_2
+- recall_3
 
 optimizer:
   type: RAdam
-  encoder:
-    lr: 7.0e-05
-    weight_decay: 3.0e-05
-  decoder:
-    lr: 0.003
-    weight_decay: 0.0003
   args:
-    lr: 0.001
+    lr: 0.0001
     weight_decay: 0.0002
 
 training:
   early_stop: 5
-  epochs: 25
+  epochs: 30
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1

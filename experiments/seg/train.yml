@@ -5,37 +5,34 @@ seed: 12145
 target_devices: [0]
 
 arch:
-  type: FPN
+  type: Unet
   args:
     encoder_name: efficientnet-b0
     encoder_weights: imagenet
     activation: null
     classes: 4
-    decoder_merge_policy: cat
-    dropout: 0.1
-    in_channels: 3
-    weight_std: false
+    dropout: 0.15
 
 augmentation:
   type: HeavyResizeTransforms
   args:
-    height: 448
-    width: 672
+    height: 320
+    width: 480
 
 data_loader:
   type: CloudSegDataLoader
   args:
-    batch_size: 12
+    batch_size: 20
     data_dir: data/raw/
     nworkers: 8
     shuffle: true
     validation_split: 0.2
 
 loss:
-  type: SmoothBCEDiceLoss
+  type: BCEDiceLoss
   args:
-    bce_weight: 0.6
-    dice_weight: 0.4
+    bce_weight: 0.7
+    dice_weight: 0.3
 
 lr_scheduler:
   type: CosineAnnealingScheduler
@@ -54,16 +51,16 @@ optimizer:
   type: RAdam
   encoder:
     lr: 7.0e-05
-    weight_decay: 3.0e-05
+    weight_decay: 1.0e-5
   decoder:
     lr: 0.003
-    weight_decay: 0.0003
+    weight_decay: 1.0e-5
   args:
     lr: 0.001
     weight_decay: 0.0002
 
 training:
-  early_stop: 3
+  early_stop: 5
   epochs: 30
   monitor: max val_dice_mean
   save_period: 1

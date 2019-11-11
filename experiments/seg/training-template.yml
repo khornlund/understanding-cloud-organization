@@ -1,39 +1,29 @@
 short_name: sever
 save_dir: saved/
 verbose: 2
-seed: 12145
+seed: 1234
 target_devices: [0]
 
 arch:
-  type: FPN
   args:
-    encoder_name: efficientnet-b0
     encoder_weights: imagenet
     activation: null
     classes: 4
-    decoder_merge_policy: cat
-    dropout: 0.2
     in_channels: 3
-    weight_std: false
-
-augmentation:
-  type: HeavyResizeTransforms
-  args:
-    height: 384
-    width: 576
 
 data_loader:
-  type: CloudSegPseudoDataLoader
+  # type: CloudSegPseudoDataLoader
+  type: CloudSegDataLoader
   args:
-    batch_size: 16
+    # batch_size: 16
     data_dir: data/raw/
     nworkers: 8
     shuffle: true
     validation_split: 0.2
-    n_pseudo_per_batch: 1
+    # n_pseudo_per_batch: 2
 
 loss:
-  type: SmoothBCEDiceLoss
+  type: BCEDiceLoss
   args:
     bce_weight: 0.6
     dice_weight: 0.4
@@ -41,7 +31,7 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 31
+    n_epochs: 41
     start_anneal: 1
 
 metrics:
@@ -64,8 +54,8 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  early_stop: 3
-  epochs: 30
+  early_stop: 8
+  epochs: 40
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1

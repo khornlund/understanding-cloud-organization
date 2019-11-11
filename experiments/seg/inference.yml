@@ -9,7 +9,7 @@ run_inference: true
 data_loader:
   type: CloudSegTestDataLoader
   args:
-    batch_size: 32
+    batch_size: 16
     data_dir: data/raw/
     nworkers: 8
     pin_memory: true

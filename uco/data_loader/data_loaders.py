@@ -7,7 +7,12 @@ from torch.utils.data import DataLoader
 
 from uco.base import DataLoaderBase
 
-from .datasets import CloudDatasetTrainVal, CloudDatasetTest, CloudDatasetPseudo
+from .datasets import (
+    CloudDatasetTrainVal,
+    CloudDatasetTest,
+    CloudDatasetPseudo,
+    CloudClasDatasetTrainVal,
+)
 from .sampler import SamplerFactory
 
 
@@ -164,3 +169,57 @@ def pivot_df(df):
     for c in range(4):
         df[f"c{c}"] = df[f"rle{c}"].apply(lambda rle: not pd.isnull(rle))
     return df
+
+
+class CloudClasDataLoader(DataLoaderBase):
+
+    train_csv = "train.csv"
+
+    def __init__(
+        self,
+        transforms,
+        data_dir,
+        batch_size,
+        shuffle,
+        validation_split,
+        nworkers,
+        pin_memory=True,
+    ):
+        self.transforms, self.shuffle = transforms, shuffle
+        self.bs, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
+        self.data_dir = Path(data_dir)
+
+        self.train_df, self.val_df = self.load_df(validation_split)
+
+        tsfm = self.transforms.build(train=True)
+        dataset = CloudClasDatasetTrainVal(self.train_df, self.data_dir, tsfm)
+
+        super().__init__(
+            dataset,
+            self.bs,
+            shuffle=shuffle,
+            num_workers=self.nworkers,
+            pin_memory=self.pin_memory,
+        )
+
+    def load_df(self, validation_split):
+        df = pd.read_csv(self.data_dir / self.train_csv)
+        df = pivot_df(df)
+        if validation_split > 0:
+            return train_test_split(
+                df, test_size=validation_split, stratify=df["n_classes"]
+            )
+        return df, pd.DataFrame({})
+
+    def split_validation(self):
+        if self.val_df.empty:
+            return None
+        else:
+            tsfm = self.transforms.build(train=False)
+            dataset = CloudClasDatasetTrainVal(self.val_df, self.data_dir, tsfm)
+            return DataLoader(
+                dataset,
+                self.bs * 2,
+                num_workers=self.nworkers,
+                pin_memory=self.pin_memory,
+            )

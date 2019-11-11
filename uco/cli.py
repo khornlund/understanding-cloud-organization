@@ -29,7 +29,7 @@ def cli():
 @click.option(
     "-c",
     "--config-filename",
-    default=["experiments/config.yml"],
+    default=["experiments/seg/config.yml"],
     multiple=True,
     help=(
         "Path to training configuration file. If multiple are provided, runs will be "
@@ -56,7 +56,7 @@ def train(config_filename, resume):
 @click.option(
     "-i",
     "--inference-config-filename",
-    default="experiments/inference.yml",
+    default="experiments/seg/inference.yml",
     help="Path to inference configuration",
 )
 @click.option(
@@ -77,7 +77,7 @@ def reindex(folder):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/inference.yml",
+    default="experiments/seg/inference.yml",
     help="Path to training configuration file.",
 )
 @click.option(
@@ -104,7 +104,7 @@ def predict(config_filename, model_checkpoint):
     help="Folder containing checkpoints",
 )
 def predict_all(folder):
-    config = load_config("experiments/inference.yml")
+    config = load_config("experiments/seg/inference.yml")
     checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
@@ -115,7 +115,7 @@ def predict_all(folder):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/inference.yml",
+    default="experiments/seg/inference.yml",
     help="Path to training configuration file.",
 )
 def average(config_filename):
@@ -130,7 +130,7 @@ def average(config_filename):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/inference.yml",
+    default="experiments/seg/inference.yml",
     help="Path to training configuration file.",
 )
 def post_process(config_filename):

@@ -1,8 +1,3 @@
-"""
-https://github.com/asanakoy/kaggle_carvana_segmentation/blob/master/asanakoy/losses.py
-https://github.com/catalyst-team/catalyst/blob/master/catalyst/dl/utils/criterion/dice.py
-"""
-from __future__ import print_function, division
 from functools import partial
 from itertools import filterfalse as ifilterfalse
 
@@ -18,6 +13,11 @@ from .scheduler import rolloff
 class UpdatableLoss(nn.Module):
     def set_epoch(self, epoch):
         pass
+
+
+class BCELoss(UpdatableLoss):
+    def forward(self, outputs, targets):
+        return F.binary_cross_entropy_with_logits(outputs, targets)
 
 
 class AnnealingLoss(UpdatableLoss):
