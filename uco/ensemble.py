@@ -105,13 +105,13 @@ class LossOptions(ConfigOptionBase):
     @classmethod
     def options(cls):
         opts = []
-        # bce_weight = np.random.uniform(0.83, 0.92)
-        # opts.append(
-        #     {
-        #         "type": "BCELovaszLoss",
-        #         "args": {"bce_weight": bce_weight, "lovasz_weight": 1 - bce_weight},
-        #     }
-        # )
+        bce_weight = np.random.uniform(0.83, 0.92)
+        opts.append(
+            {
+                "type": "BCELovaszLoss",
+                "args": {"bce_weight": bce_weight, "lovasz_weight": 1 - bce_weight},
+            }
+        )
         bce_weight = np.random.uniform(0.65, 0.75)
         opts.append(
             {
@@ -119,9 +119,6 @@ class LossOptions(ConfigOptionBase):
                 "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
             }
         )
-        # opts.append(
-        #     {"type": "BCEDiceLoss", "args": {"bce_weight": 0.99, "dice_weight": 0.01}}
-        # )
         return opts
 
     @classmethod
@@ -135,14 +132,8 @@ class OptimizerOptions(ConfigOptionBase):
     def options(cls):
         return [
             {
-                "optim": np.random.choice(
-                    [
-                        # "RAdam",
-                        "QHAdamW"
-                    ]
-                ),
-                # "encoder": np.random.uniform(5e-5, 9e-5),
-                "encoder": np.random.uniform(5e-5, 6e-5),
+                "optim": np.random.choice(["RAdam", "QHAdamW"]),
+                "encoder": np.random.uniform(5e-5, 9e-5),
                 "decoder": np.random.uniform(3e-3, 4e-3),
             }
         ]
@@ -153,10 +144,6 @@ class OptimizerOptions(ConfigOptionBase):
         config["optimizer"]["type"] = str(option["optim"])
         config["optimizer"]["encoder"]["lr"] = float(option["encoder"])
         config["optimizer"]["decoder"]["lr"] = float(option["decoder"])
-
-        # if config["loss"]["args"]["bce_weight"] > 0.98:
-        #     config["optimizer"]["encoder"]["lr"] *= 1.5
-        #     config["optimizer"]["decoder"]["lr"] *= 1.5
         return config
 
 
@@ -167,11 +154,11 @@ class ModelOptions(ConfigOptionBase):
         transforms = str(
             np.random.choice(
                 [
-                    # "CutoutTransforms",
-                    # "CutoutImgOnlyTransforms",
-                    # "DistortionTransforms",
-                    # "CutoutDistortionTransforms",
-                    "HeavyResizeTransforms"
+                    "CutoutTransforms",
+                    "CutoutImgOnlyTransforms",
+                    "DistortionTransforms",
+                    "CutoutDistortionTransforms",
+                    "HeavyResizeTransforms",
                 ]
             )
         )
@@ -207,19 +194,19 @@ class ModelOptions(ConfigOptionBase):
                     },
                 },
                 # fpn - efficientnet-b2
-                # {
-                #     "type": "FPN",
-                #     "args": {
-                #         "encoder_name": "efficientnet-b2",
-                #         "dropout": dropout,
-                #         "decoder_merge_policy": "cat",
-                #     },
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # },
+                {
+                    "type": "FPN",
+                    "args": {
+                        "encoder_name": "efficientnet-b2",
+                        "dropout": dropout,
+                        "decoder_merge_policy": "cat",
+                    },
+                    "batch_size": 16,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
             ]
             if GPU == 11
             else [
