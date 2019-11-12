@@ -8,7 +8,7 @@ from tqdm import tqdm
 from uco.data_loader import PseudoLabelBuilder
 from uco.ensemble import EnsembleManager
 from uco.runner import TrainingManager, InferenceManager
-from uco.h5 import HDF5AverageWriter, PostProcessor
+from uco import h5
 from uco.utils import (
     load_config,
     load_train_config,
@@ -103,8 +103,14 @@ def predict(config_filename, model_checkpoint):
     default="saved/training",
     help="Folder containing checkpoints",
 )
-def predict_all(folder):
-    config = load_config("experiments/seg/inference.yml")
+@click.option(
+    "-c",
+    "--config-filename",
+    default="experiments/seg/inference.yml",
+    help="Path to inference configuration file.",
+)
+def predict_all(folder, config_filename):
+    config = load_config(config_filename)
     checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
@@ -121,7 +127,7 @@ def predict_all(folder):
 def average(config_filename):
     config = load_config(config_filename)
     setup_logging(config)
-    HDF5AverageWriter(verbose=config["verbose"]).average(
+    getattr(h5, config["average"])(verbose=config["verbose"]).average(
         config["output"]["raw"], config["output"]["avg"]
     )
 
@@ -136,10 +142,11 @@ def average(config_filename):
 def post_process(config_filename):
     config = load_config(config_filename)
     setup_logging(config)
-    PostProcessor(verbose=config["verbose"]).process(
-        config["output"]["avg"],
-        config["data_loader"]["args"]["data_dir"],
-        config["output"]["sub"],
+    h5.PostProcessor(verbose=2).process(
+        "data/predictions/avg-seg-predictions.h5",
+        "data/predictions/avg-clas-predictions.h5",
+        "data/raw/",
+        "data/predictions/submission.csv",
     )
 
 

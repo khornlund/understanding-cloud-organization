@@ -5,22 +5,22 @@ device: 1
 verbose: 2
 tensorboard: false
 run_inference: true
-score_threshold: 0.605
+score_threshold: 0.0  # no threshold
 
 data_loader:
-  type: CloudSegTestDataLoader
+  type: CloudClasTestDataLoader
   args:
     batch_size: 16
     data_dir: data/raw/
     nworkers: 8
     pin_memory: true
 
-tta: SegmentationTTAWrapper
-write: HDF5SegPredictionWriter
-average: HDF5SegAverageWriterBase
+tta: ClassificationTTAWrapper
+write: HDF5ClasPredictionWriter
+average: HDF5ClasAverageWriterBase
 
 output:
-  raw: data/predictions/raw-seg-predictions.h5
-  avg: data/predictions/avg-seg-predictions.h5
+  raw: data/predictions/raw-clas-predictions.h5
+  avg: data/predictions/avg-clas-predictions.h5
   sub: data/predictions/submission.csv
   log: data/predictions/log.csv

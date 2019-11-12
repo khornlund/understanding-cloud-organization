@@ -69,6 +69,41 @@ class CloudDatasetTest(CloudDatasetBase):
         return f, img
 
 
+class CloudClasDatasetTrainVal(CloudDatasetBase):
+
+    img_folder = "train_images"
+
+    def __init__(self, df, data_dir, transforms):
+        super().__init__(df, data_dir, transforms)
+        self.transforms = transforms
+
+    def __getitem__(self, idx):
+        mask = make_mask(self.rle(idx))
+        _, img = self.read_rgb(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        img = augmented["image"]
+        mask = augmented["mask"]
+        targets = np.array(
+            [mask[:, :, c].sum() > 0 for c in range(4)], dtype=np.float32
+        )
+        return img, targets
+
+
+class CloudClasDatasetTest(CloudDatasetBase):
+
+    img_folder = "test_images"
+
+    def __init__(self, df, data_dir, transforms):
+        super().__init__(df, data_dir, transforms)
+        self.transforms = transforms
+
+    def __getitem__(self, idx):
+        f, img = self.read_rgb(idx)
+        augmented = self.transforms(image=img)
+        img = augmented["image"]
+        return f, img
+
+
 class CloudDatasetPseudo(CloudDatasetBase):
 
     img_folder = "joined_images"
@@ -85,23 +120,3 @@ class CloudDatasetPseudo(CloudDatasetBase):
         mask = augmented["mask"]
         mask = mask.permute(2, 0, 1)  # HxWxC => CxHxW
         return img, mask
-
-
-class CloudClasDatasetTrainVal(CloudDatasetBase):
-
-    img_folder = "train_images"
-
-    def __init__(self, df, data_dir, transforms):
-        super().__init__(df, data_dir, transforms)
-        self.transforms = transforms
-
-    def __getitem__(self, idx):
-        mask = make_mask(self.rle(idx))
-        _, img = self.read_rgb(idx)
-        augmented = self.transforms(image=img, mask=mask)
-        img = augmented["image"]
-        mask = augmented["mask"]
-        targets = np.array(
-            [mask[:, :, :, c].sum() > 0 for c in range(4)], dtype=np.float32
-        )
-        return img, targets

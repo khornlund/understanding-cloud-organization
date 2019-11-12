@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import ttach as tta
 from tqdm import tqdm
-from torchvision.utils import make_grid
 
 import uco.model.optimizer as module_optimizer
 import uco.model.scheduler as module_scheduler
@@ -16,9 +15,9 @@ import uco.model.loss as module_loss
 import uco.model.metric as module_metric
 import uco.model.model as module_arch
 from uco.trainer import Trainer
-from uco.utils import setup_logger, setup_logging, TensorboardWriter, seed_everything
+from uco.utils import setup_logger, setup_logging, seed_everything
 
-from .h5 import HDF5PredictionWriter
+from . import h5
 
 
 class ManagerBase:
@@ -107,8 +106,8 @@ class TrainingManager(ManagerBase):
         model, device = self.setup_device(model, cfg["target_devices"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
-        param_groups = self.setup_param_groups_segmentation(model, cfg["optimizer"])
-        # param_groups = self.setup_param_groups_classifier(model, cfg["optimizer"])
+        # param_groups = self.setup_param_groups_segmentation(model, cfg["optimizer"])
+        param_groups = self.setup_param_groups_classifier(model, cfg["optimizer"])
         optimizer = self.get_instance(module_optimizer, "optimizer", cfg, param_groups)
         lr_scheduler = self.get_instance(
             module_scheduler, "lr_scheduler", cfg, optimizer
@@ -201,8 +200,8 @@ class TrainingManager(ManagerBase):
         self.logger.info(f"Found {len(bias_params)} bias params")
 
         params = [
-            {"params": weight_params, **config},
-            {"params": bias_params, "lr": config["lr"]},
+            {"params": weight_params, **config["args"]},
+            {"params": bias_params, "lr": config["args"]["lr"]},
         ]
         return params
 
@@ -235,8 +234,6 @@ class InferenceManager(ManagerBase):
     Top level class to perform inference.
     """
 
-    SCORE_THRESHOLD = 0.605
-
     def run(self, model_checkpoint: str) -> None:
         cfg = self.cfg.copy()
         device = self.setup_device(cfg["device"])
@@ -250,7 +247,7 @@ class InferenceManager(ManagerBase):
         model.load_state_dict(checkpoint["state_dict"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
-        tta_model = tta.SegmentationTTAWrapper(
+        tta_model = getattr(tta, cfg["tta"])(
             model,
             tta.Compose([tta.HorizontalFlip(), tta.VerticalFlip()]),
             merge_mode="mean",
@@ -261,21 +258,17 @@ class InferenceManager(ManagerBase):
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
 
         timestamp = Path(model_checkpoint).parent.parent.name
-        rw = HDF5PredictionWriter(
+        rw = getattr(h5, cfg["write"])(
             filename=cfg["output"]["raw"],
-            dataset=timestamp,
-            mean_dice=checkpoint["monitor_best"].item(),
+            dataset_name=timestamp,
+            score=self.extract_score(checkpoint),
         )
-        writer_dir = Path(cfg["save_dir"]) / cfg["name"] / timestamp
-        writer = TensorboardWriter(writer_dir, cfg["tensorboard"])
         self.logger.info("Performing inference")
         tta_model.eval()
         with torch.no_grad():
             for bidx, (f, data) in tqdm(enumerate(data_loader), total=len(data_loader)):
                 data = data.to(device)
                 output = torch.sigmoid(tta_model(data))
-                if bidx % 10 == 0:
-                    self.log_predictions_tensorboard(writer, bidx, data, output)
                 output = output.cpu().numpy()
                 rw.write(output)
 
@@ -283,24 +276,19 @@ class InferenceManager(ManagerBase):
 
     # -- helpers ---------------------------------------------------------------------
 
-    def log_predictions_tensorboard(self, writer, bidx, data, output):
-        writer.set_step(bidx, "inference")
-        data, output = data.cpu(), output.cpu()
-        data_grayscale = torch.mean(data, dim=1, keepdim=True)
-        for c in range(4):
-            image = torch.cat([data_grayscale, output[:, c : c + 1, :, :]], dim=0)
-            writer.add_image(
-                f"class_{c}",
-                make_grid(image, nrow=data.size(0), normalize=True, scale_each=True),
-            )
-
     def check_score(self, checkpoint):
-        best_score = checkpoint["monitor_best"].item()
+        best_score = self.extract_score(checkpoint)
         self.logger.info(f"Best score: {best_score}")
-        if best_score < self.SCORE_THRESHOLD:
+        if best_score < self.cfg["score_threshold"]:
             self.logger.warning(f"Skipping low scoring model")
             return False
         return True
+
+    def extract_score(self, checkpoint):
+        best_score = checkpoint["monitor_best"]
+        if isinstance(best_score, torch.Tensor):
+            best_score = best_score.item()
+        return best_score
 
     def load_checkpoint(self, path, device):
         """

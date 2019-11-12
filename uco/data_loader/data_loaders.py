@@ -12,6 +12,7 @@ from .datasets import (
     CloudDatasetTest,
     CloudDatasetPseudo,
     CloudClasDatasetTrainVal,
+    CloudClasDatasetTest,
 )
 from .sampler import SamplerFactory
 
@@ -159,18 +160,6 @@ class CloudSegTestDataLoader(DataLoaderBase):
         return df
 
 
-def pivot_df(df):
-    df["Image"], df["Label"] = zip(*df["Image_Label"].str.split("_"))
-    df = df.pivot(index="Image", columns="Label", values="EncodedPixels")
-    df.columns = [f"rle{c}" for c in range(4)]
-    df["n_classes"] = df.count(axis=1)
-
-    # add classification columns
-    for c in range(4):
-        df[f"c{c}"] = df[f"rle{c}"].apply(lambda rle: not pd.isnull(rle))
-    return df
-
-
 class CloudClasDataLoader(DataLoaderBase):
 
     train_csv = "train.csv"
@@ -223,3 +212,42 @@ class CloudClasDataLoader(DataLoaderBase):
                 num_workers=self.nworkers,
                 pin_memory=self.pin_memory,
             )
+
+
+class CloudClasTestDataLoader(DataLoaderBase):
+
+    test_csv = "sample_submission.csv"
+
+    def __init__(self, transforms, data_dir, batch_size, nworkers, pin_memory=True):
+        self.bs, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
+        self.data_dir = Path(data_dir)
+        self.test_df = self.load_df()
+        tsfm = transforms.build(train=False)
+        dataset = CloudClasDatasetTest(self.test_df, self.data_dir, tsfm)
+        super().__init__(
+            dataset,
+            self.bs,
+            shuffle=False,
+            num_workers=self.nworkers,
+            pin_memory=self.pin_memory,
+        )
+
+    def load_df(self):
+        df = pd.read_csv(self.data_dir / self.test_csv)
+        df = df.iloc[np.arange(0, df.shape[0], step=4)]  # filenames are repeated 4x
+        df.columns = ["Image", "EncodedPixels"]
+        df["Image"] = df["Image"].apply(lambda f: f.split("_")[0])
+        df.set_index("Image", inplace=True)
+        return df
+
+
+def pivot_df(df):
+    df["Image"], df["Label"] = zip(*df["Image_Label"].str.split("_"))
+    df = df.pivot(index="Image", columns="Label", values="EncodedPixels")
+    df.columns = [f"rle{c}" for c in range(4)]
+    df["n_classes"] = df.count(axis=1)
+
+    # add classification columns
+    for c in range(4):
+        df[f"c{c}"] = df[f"rle{c}"].apply(lambda rle: not pd.isnull(rle))
+    return df

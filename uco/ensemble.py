@@ -4,8 +4,14 @@ from copy import deepcopy
 
 import numpy as np
 
-from uco.runner import TrainingManager, InferenceManager
-from uco.utils import setup_logger, setup_logging, load_config, seed_everything, Indexer
+from uco.runner import TrainingManager, InferenceManager  # noqa
+from uco.utils import (  # noqa
+    setup_logger,
+    setup_logging,
+    load_config,
+    seed_everything,
+    Indexer,
+)
 
 
 GPU = 11  # RTX 2080Ti
@@ -30,7 +36,7 @@ class EnsembleManager:
                 seed_everything(seed)
                 # train_config = randomiser.generate()
 
-                config_filenames = list(Path("experiments/blessed").glob("*.yml"))
+                config_filenames = list(Path("experiments/clas").glob("*.yml"))
                 train_config = load_config(np.random.choice(config_filenames))
                 train_config["seed"] = seed
 
@@ -43,18 +49,15 @@ class EnsembleManager:
 
                 # delete other checkpoints
                 for f in checkpoint_dir.glob("checkpoint-epoch*.pth"):
-                    if "model_best" in f.name:
-                        self.logger.warning(f"Search found {f}")
-                        continue
                     self.logger.info(f"Deleting {f}")
                     f.unlink()
 
-                # Log details for run
-                Indexer.index(checkpoint_dir.parent)
+                # # Log details for run
+                # Indexer.index(checkpoint_dir.parent)
 
-                if self.run_inference:  # run inference using the best model
-                    model_checkpoint = checkpoint_dir / "model_best.pth"
-                    InferenceManager(self.infer_config).run(model_checkpoint)
+                # if self.run_inference:  # run inference using the best model
+                #     model_checkpoint = checkpoint_dir / "model_best.pth"
+                #     InferenceManager(self.infer_config).run(model_checkpoint)
             except Exception as ex:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")

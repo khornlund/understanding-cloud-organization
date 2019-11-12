@@ -17,7 +17,7 @@ class UpdatableLoss(nn.Module):
 
 class BCELoss(UpdatableLoss):
     def forward(self, outputs, targets):
-        return F.binary_cross_entropy_with_logits(outputs, targets)
+        return {"loss": F.binary_cross_entropy_with_logits(outputs, targets)}
 
 
 class AnnealingLoss(UpdatableLoss):
@@ -101,7 +101,7 @@ class BCELovaszLoss(UpdatableLoss):
         bce_weight: float = 0.5,
         lovasz_weight: float = 0.5,
         per_image=True,
-        per_class=False,
+        per_class=True,
     ):
         super().__init__()
 

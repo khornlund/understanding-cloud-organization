@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch
 
 
@@ -135,3 +137,68 @@ def _confusion(prediction, truth):
     false_negatives = torch.sum(confusion_vector == 0).item()
 
     return true_positives, false_positives, true_negatives, false_negatives
+
+
+precision_0_20 = partial(precision_0, threshold=0.20)
+precision_0_30 = partial(precision_0, threshold=0.30)
+precision_0_40 = partial(precision_0, threshold=0.40)
+precision_0_50 = partial(precision_0, threshold=0.50)
+precision_0_60 = partial(precision_0, threshold=0.60)
+precision_0_70 = partial(precision_0, threshold=0.70)
+precision_0_80 = partial(precision_0, threshold=0.80)
+
+precision_1_20 = partial(precision_1, threshold=0.20)
+precision_1_30 = partial(precision_1, threshold=0.30)
+precision_1_40 = partial(precision_1, threshold=0.40)
+precision_1_50 = partial(precision_1, threshold=0.50)
+precision_1_60 = partial(precision_1, threshold=0.60)
+precision_1_70 = partial(precision_1, threshold=0.70)
+precision_1_80 = partial(precision_1, threshold=0.80)
+
+precision_2_20 = partial(precision_2, threshold=0.20)
+precision_2_30 = partial(precision_2, threshold=0.30)
+precision_2_40 = partial(precision_2, threshold=0.40)
+precision_2_50 = partial(precision_2, threshold=0.50)
+precision_2_60 = partial(precision_2, threshold=0.60)
+precision_2_70 = partial(precision_2, threshold=0.70)
+precision_2_80 = partial(precision_2, threshold=0.80)
+
+precision_3_20 = partial(precision_3, threshold=0.20)
+precision_3_30 = partial(precision_3, threshold=0.30)
+precision_3_40 = partial(precision_3, threshold=0.40)
+precision_3_50 = partial(precision_3, threshold=0.50)
+precision_3_60 = partial(precision_3, threshold=0.60)
+precision_3_70 = partial(precision_3, threshold=0.70)
+precision_3_80 = partial(precision_3, threshold=0.80)
+
+recall_0_20 = partial(recall_0, threshold=0.20)
+recall_0_30 = partial(recall_0, threshold=0.30)
+recall_0_40 = partial(recall_0, threshold=0.40)
+recall_0_50 = partial(recall_0, threshold=0.50)
+recall_0_60 = partial(recall_0, threshold=0.60)
+recall_0_70 = partial(recall_0, threshold=0.70)
+recall_0_80 = partial(recall_0, threshold=0.80)
+
+recall_1_20 = partial(recall_1, threshold=0.20)
+recall_1_30 = partial(recall_1, threshold=0.30)
+recall_1_40 = partial(recall_1, threshold=0.40)
+recall_1_50 = partial(recall_1, threshold=0.50)
+recall_1_60 = partial(recall_1, threshold=0.60)
+recall_1_70 = partial(recall_1, threshold=0.70)
+recall_1_80 = partial(recall_1, threshold=0.80)
+
+recall_2_20 = partial(recall_2, threshold=0.20)
+recall_2_30 = partial(recall_2, threshold=0.30)
+recall_2_40 = partial(recall_2, threshold=0.40)
+recall_2_50 = partial(recall_2, threshold=0.50)
+recall_2_60 = partial(recall_2, threshold=0.60)
+recall_2_70 = partial(recall_2, threshold=0.70)
+recall_2_80 = partial(recall_2, threshold=0.80)
+
+recall_3_20 = partial(recall_3, threshold=0.20)
+recall_3_30 = partial(recall_3, threshold=0.30)
+recall_3_40 = partial(recall_3, threshold=0.40)
+recall_3_50 = partial(recall_3, threshold=0.50)
+recall_3_60 = partial(recall_3, threshold=0.60)
+recall_3_70 = partial(recall_3, threshold=0.70)
+recall_3_80 = partial(recall_3, threshold=0.80)

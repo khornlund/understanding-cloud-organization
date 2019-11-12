@@ -28,13 +28,13 @@ class Trainer(TrainerBase):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.bs)) * 8
+        self.log_step = int(np.sqrt(data_loader.bs)) * 32
         self.start_val_epoch = config["training"]["start_val_epoch"]
         self.unfreeze_encoder = config["training"]["unfreeze_encoder"]
 
-        self.logger.info("Freezing encoder weights")
-        for p in self.model.encoder.parameters():
-            p.requires_grad = False
+        # self.logger.info("Freezing encoder weights")
+        # for p in self.model.encoder.parameters():
+        #     p.requires_grad = False
 
     def _train_epoch(self, epoch: int) -> dict:
         """
@@ -45,11 +45,11 @@ class Trainer(TrainerBase):
         dict
             Dictionary containing results for the epoch.
         """
-        if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
-            self.logger.info("Unfreezing encoder weights")
-            for p in self.model.encoder.parameters():
-                p.requires_grad = True
-            self.unfreeze_encoder = None
+        # if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
+        #     self.logger.info("Unfreezing encoder weights")
+        #     for p in self.model.encoder.parameters():
+        #         p.requires_grad = True
+        #     self.unfreeze_encoder = None
 
         self.loss.set_epoch(epoch)
         self.model.train()
@@ -59,7 +59,7 @@ class Trainer(TrainerBase):
                 self.writer.add_scalar("LR/encoder", param_group["lr"])
             elif i == 1:
                 self.writer.add_scalar("LR/decoder", param_group["lr"])
-        self.writer.add_scalar("weight/bce", self.loss.bce_weight)
+        # self.writer.add_scalar("weight/bce", self.loss.bce_weight)
 
         loss_mtrs = [AverageMeter(loss) for loss in ["loss", "bce", "dice", "lovasz"]]
         metric_mtrs = [AverageMeter(m.__name__) for m in self.metrics]
