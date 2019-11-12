@@ -7,19 +7,19 @@ target_devices: [0]
 arch:
   type: EfficientNet
   args:
-    model_name: efficientnet-b4
+    encoder_name: efficientnet-b2
     classes: 4
 
 augmentation:
   type: CutoutDistortionTransforms
   args:
-    height: 320
-    width: 480
+    height: 384
+    width: 576
 
 data_loader:
   type: CloudClasDataLoader
   args:
-    batch_size: 12
+    batch_size: 16
     data_dir: data/raw/
     nworkers: 8
     shuffle: true
@@ -32,8 +32,8 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 26
-    start_anneal: 1
+    n_epochs: 31
+    start_anneal: 5
 
 optimizer:
   type: RAdam
@@ -42,8 +42,8 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  early_stop: 6
-  epochs: 25
+  early_stop: 5
+  epochs: 30
   monitor: min val_loss
   save_period: 1
   start_val_epoch: 1

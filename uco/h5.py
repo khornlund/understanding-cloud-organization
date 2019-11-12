@@ -27,11 +27,13 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
     Handles writing prediction output to HDF5 by rounding to scaled uint8.
     """
 
-    def __init__(self, filename, dataset_name):
+    def __init__(self, filename, group_name, dataset_name):
         self.filename = Path(filename)
+        self.group_name = group_name
         self.dataset_name = dataset_name
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         self.f = h5py.File(self.filename, "a")
+        self.group = self.f.create_group(group_name)
         self.counter = 0
 
     def close(self):
@@ -40,7 +42,7 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
     def summarise(self):
         return (
             f"Wrote {self.counter} predictions to "
-            f'"{self.filename}" /{self.dataset_name}'
+            f'"{self.filename}" /{self.group_name}/{self.dataset_name}'
         )
 
 
@@ -48,11 +50,11 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
     def __init__(self, filename, dataset_name, score):
         super().__init__(filename, dataset_name)
         try:
-            self.dset = self.f.create_dataset(
+            self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="uint8"
             )
         except Exception as _:  # noqa
-            self.dset = self.f[self.dataset_name]
+            self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
         self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)
 
@@ -77,11 +79,11 @@ class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
     def __init__(self, filename, dataset_name, score):
         super().__init__(filename, dataset_name)
         try:
-            self.dset = self.f.create_dataset(
+            self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C), dtype="uint8"
             )
         except Exception as _:  # noqa
-            self.dset = self.f[self.dataset_name]
+            self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
 
     def write(self, data):

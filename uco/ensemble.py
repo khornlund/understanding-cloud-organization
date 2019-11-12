@@ -36,7 +36,7 @@ class EnsembleManager:
                 seed_everything(seed)
                 # train_config = randomiser.generate()
 
-                config_filenames = list(Path("experiments/clas").glob("*.yml"))
+                config_filenames = list(Path("experiments/clas/train").glob("*.yml"))
                 train_config = load_config(np.random.choice(config_filenames))
                 train_config["seed"] = seed
 

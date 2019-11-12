@@ -239,30 +239,18 @@ class InferenceManager(ManagerBase):
         device = self.setup_device(cfg["device"])
         torch.cuda.set_device(device)
         checkpoint = self.load_checkpoint(model_checkpoint, device)
-        if not self.check_score(checkpoint):
-            return
+        best_score = self.check_score(checkpoint)
         train_cfg = checkpoint["config"]
 
         model = self.get_instance(module_arch, "arch", train_cfg)
         model.load_state_dict(checkpoint["state_dict"])
         torch.backends.cudnn.benchmark = True  # disable if not consistent input sizes
 
-        tta_model = getattr(tta, cfg["tta"])(
-            model,
-            tta.Compose([tta.HorizontalFlip(), tta.VerticalFlip()]),
-            merge_mode="mean",
-        )
-        tta_model.to(device)
-
+        tta_model = self.build_tta_model(model, cfg, device)
         transforms = self.get_instance(module_aug, "augmentation", train_cfg)
         data_loader = self.get_instance(module_data, "data_loader", cfg, transforms)
+        writer = self.build_h5_writer(cfg, train_cfg, model_checkpoint, best_score)
 
-        timestamp = Path(model_checkpoint).parent.parent.name
-        rw = getattr(h5, cfg["write"])(
-            filename=cfg["output"]["raw"],
-            dataset_name=timestamp,
-            score=self.extract_score(checkpoint),
-        )
         self.logger.info("Performing inference")
         tta_model.eval()
         with torch.no_grad():
@@ -270,19 +258,44 @@ class InferenceManager(ManagerBase):
                 data = data.to(device)
                 output = torch.sigmoid(tta_model(data))
                 output = output.cpu().numpy()
-                rw.write(output)
+                writer.write(output)
 
-        self.logger.info(rw.close())
+        self.logger.info(writer.close())
 
     # -- helpers ---------------------------------------------------------------------
+
+    def build_tta_model(self, model, config, device):
+        tta_model = getattr(tta, config["tta"])(
+            model,
+            tta.Compose([tta.HorizontalFlip(), tta.VerticalFlip()]),
+            merge_mode="mean",
+        )
+        tta_model.to(device)
+        return tta_model
+
+    def build_h5_writer(self, config, train_cfg, model_checkpoint, score):
+        group_name = self.get_group_name_for_config(train_cfg)
+        writer = getattr(h5, config["write"])(
+            filename=config["output"]["raw"],
+            group_name=group_name,
+            dataset_name=Path(model_checkpoint).parent.parent.name,
+            score=score,
+        )
+        return writer
+
+    def get_group_name_for_config(self, train_cfg):
+        decoder = train_cfg["arch"]["type"]
+        encoder = train_cfg["arch"]["encoder_name"]
+        return f"{encoder}-{decoder}"
 
     def check_score(self, checkpoint):
         best_score = self.extract_score(checkpoint)
         self.logger.info(f"Best score: {best_score}")
         if best_score < self.cfg["score_threshold"]:
-            self.logger.warning(f"Skipping low scoring model")
-            return False
-        return True
+            msg = f"Skipping low scoring model"
+            self.logger.warning(msg)
+            raise Exception(msg)
+        return best_score
 
     def extract_score(self, checkpoint):
         best_score = checkpoint["monitor_best"]
@@ -291,9 +304,6 @@ class InferenceManager(ManagerBase):
         return best_score
 
     def load_checkpoint(self, path, device):
-        """
-        Load a saved checkpoint.
-        """
         self.logger.info(f"Loading checkpoint: {path}")
         checkpoint = torch.load(path, map_location=device)
         return checkpoint

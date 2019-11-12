@@ -1,0 +1,110 @@
+short_name: sever
+save_dir: saved/clas
+verbose: 2
+seed: 12145
+target_devices: [0]
+
+arch:
+  type: EfficientNet
+  args:
+    encoder_name: efficientnet-b4
+    classes: 4
+
+augmentation:
+  type: CutoutDistortionTransforms
+  args:
+    height: 320
+    width: 480
+
+data_loader:
+  type: CloudClasDataLoader
+  args:
+    batch_size: 12
+    data_dir: data/raw/
+    nworkers: 8
+    shuffle: true
+    validation_split: 0.2
+
+loss:
+  type: BCELoss
+  args: {}
+
+lr_scheduler:
+  type: CosineAnnealingScheduler
+  args:
+    n_epochs: 26
+    start_anneal: 1
+
+optimizer:
+  type: RAdam
+  args:
+    lr: 0.00005
+    weight_decay: 0.0002
+
+training:
+  early_stop: 6
+  epochs: 25
+  monitor: min val_loss
+  save_period: 1
+  start_val_epoch: 1
+  tensorboard: true
+  unfreeze_encoder: 0
+  verbose: 2
+
+metrics:
+- precision_0_20
+- precision_0_30
+- precision_0_40
+- precision_0_50
+- precision_0_60
+- precision_0_70
+- precision_0_80
+- precision_1_20
+- precision_1_30
+- precision_1_40
+- precision_1_50
+- precision_1_60
+- precision_1_70
+- precision_1_80
+- precision_2_20
+- precision_2_30
+- precision_2_40
+- precision_2_50
+- precision_2_60
+- precision_2_70
+- precision_2_80
+- precision_3_20
+- precision_3_30
+- precision_3_40
+- precision_3_50
+- precision_3_60
+- precision_3_70
+- precision_3_80
+- recall_0_20
+- recall_0_30
+- recall_0_40
+- recall_0_50
+- recall_0_60
+- recall_0_70
+- recall_0_80
+- recall_1_20
+- recall_1_30
+- recall_1_40
+- recall_1_50
+- recall_1_60
+- recall_1_70
+- recall_1_80
+- recall_2_20
+- recall_2_30
+- recall_2_40
+- recall_2_50
+- recall_2_60
+- recall_2_70
+- recall_2_80
+- recall_3_20
+- recall_3_30
+- recall_3_40
+- recall_3_50
+- recall_3_60
+- recall_3_70
+- recall_3_80

@@ -30,11 +30,6 @@ class Trainer(TrainerBase):
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.bs)) * 32
         self.start_val_epoch = config["training"]["start_val_epoch"]
-        self.unfreeze_encoder = config["training"]["unfreeze_encoder"]
-
-        # self.logger.info("Freezing encoder weights")
-        # for p in self.model.encoder.parameters():
-        #     p.requires_grad = False
 
     def _train_epoch(self, epoch: int) -> dict:
         """
@@ -45,12 +40,6 @@ class Trainer(TrainerBase):
         dict
             Dictionary containing results for the epoch.
         """
-        # if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
-        #     self.logger.info("Unfreezing encoder weights")
-        #     for p in self.model.encoder.parameters():
-        #         p.requires_grad = True
-        #     self.unfreeze_encoder = None
-
         self.loss.set_epoch(epoch)
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
@@ -147,6 +136,7 @@ class Trainer(TrainerBase):
 
     def _eval_metrics(self, output, target):
         with torch.no_grad():
+            output = torch.sigmoid(output)
             for metric in self.metrics:
                 value = metric(output, target)
                 yield value
