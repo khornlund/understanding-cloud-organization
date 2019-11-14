@@ -30,6 +30,7 @@ dependencies:
   - kaggle
   - pre-commit
   - black
+  - owslib
   - pip
   - pip:
     - albumentations
