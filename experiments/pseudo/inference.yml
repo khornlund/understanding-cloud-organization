@@ -12,7 +12,7 @@ training:
   template: experiments/seg/training-template.yml
 
 data_loader:
-  type: CloudSegTestDataLoader
+  type: CloudSegPseudoTestDataLoader
   args:
     batch_size: 16
     data_dir: data/raw/
@@ -24,7 +24,7 @@ write: HDF5SegPredictionWriter
 average: HDF5SegAverageWriterBase
 
 output:
-  raw: data/predictions/raw-seg-predictions.h5
-  avg: data/predictions/avg-seg-predictions.h5
+  raw: data/predictions/raw-pseudo-seg-predictions.h5
+  avg: data/predictions/avg-pseudo-seg-predictions.h5
   sub: data/predictions/submission.csv
   log: data/predictions/log.csv

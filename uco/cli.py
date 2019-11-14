@@ -9,6 +9,7 @@ from uco.data_loader import PseudoLabelBuilder
 from uco.ensemble import EnsembleManager
 from uco.runner import TrainingManager, InferenceManager
 from uco import h5
+from uco.download import MapDownloader
 from uco.utils import (
     load_config,
     load_train_config,
@@ -54,16 +55,16 @@ def train(config_filename, resume):
 
 @cli.command()
 @click.option(
-    "-i",
-    "--inference-config-filename",
+    "-c",
+    "--config-filename",
     default="experiments/seg/inference.yml",
     help="Path to inference configuration",
 )
 @click.option(
     "-n", "--num-models", default=5, help="How many models should be in the ensemble?"
 )
-def train_ensemble(inference_config_filename, num_models):
-    config = load_config(inference_config_filename)
+def train_ensemble(config_filename, num_models):
+    config = load_config(config_filename)
     EnsembleManager(config).start(num_models)
 
 
@@ -111,10 +112,13 @@ def predict(config_filename, model_checkpoint):
 )
 def predict_all(folder, config_filename):
     config = load_config(config_filename)
-    checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))
+    checkpoints = sorted(list(Path(folder).glob("1113*/checkpoints/model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
-        InferenceManager(config).run(checkpoint)
+        try:
+            InferenceManager(config).run(checkpoint)
+        except Exception as ex:
+            print(f"Caught exception: {ex}")
 
 
 @cli.command()
@@ -166,7 +170,7 @@ def submit(filename, name):
     help="Folder containing checkpoints",
 )
 @click.option("-s", "--score-cutoff", default=0.60, help="delete runs with low scores")
-def prune(folder, score_cutoff):
+def prune_seg(folder, score_cutoff):
     checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))[:-2]
     counter = 0
     for c in tqdm(checkpoints):
@@ -185,8 +189,41 @@ def prune(folder, score_cutoff):
 
 @cli.command()
 @click.option(
+    "-f",
+    "--folder",
+    type=str,
+    default="saved/clas/training",
+    help="Folder containing checkpoints",
+)
+@click.option("-s", "--score-cutoff", default=0.495, help="delete runs with high loss")
+def prune_clas(folder, score_cutoff):
+    checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))[:-2]
+    counter = 0
+    for c in tqdm(checkpoints):
+        try:
+            state_dict = torch.load(c, map_location=torch.device("cpu"))
+            if state_dict["monitor_best"] > score_cutoff:
+                parent = c.parent.parent
+                if "training" in parent.name:  # safety
+                    raise Exception("About to delete training directory!")
+                shutil.rmtree(parent)
+                counter += 1
+        except Exception as ex:
+            print(f"Caught exception for {c}: {ex}")
+    print(f"Deleted {counter}/{len(checkpoints)} checkpoints")
+
+
+@cli.command()
+@click.option(
     "-s", "--submission-filename", type=str, default="data/predictions/submission.csv"
 )
 @click.option("-d", "--data-directory", type=str, default="data/raw")
 def create_pseudo(submission_filename, data_directory):
     PseudoLabelBuilder.build(submission_filename, data_directory)
+
+
+@cli.command()
+@click.option("-o", "--output-directory", default="data/raw/gibs", type=str)
+@click.option("-n", "--num-workers", default=4, type=int)
+def download_gibs(output_directory, num_workers):
+    MapDownloader(output_directory, num_workers).download()

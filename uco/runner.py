@@ -285,7 +285,7 @@ class InferenceManager(ManagerBase):
 
     def get_group_name_for_config(self, train_cfg):
         decoder = train_cfg["arch"]["type"]
-        encoder = train_cfg["arch"]["encoder_name"]
+        encoder = train_cfg["arch"]["args"]["encoder_name"]
         return f"{encoder}-{decoder}"
 
     def check_score(self, checkpoint):

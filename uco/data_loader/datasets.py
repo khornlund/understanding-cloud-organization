@@ -104,9 +104,9 @@ class CloudClasDatasetTest(CloudDatasetBase):
         return f, img
 
 
-class CloudDatasetPseudo(CloudDatasetBase):
+class CloudDatasetPseudoTrain(CloudDatasetBase):
 
-    img_folder = "joined_images"
+    img_folder = "gibs"
 
     def __init__(self, df, data_dir, transforms):
         super().__init__(df, data_dir, transforms)
@@ -120,3 +120,18 @@ class CloudDatasetPseudo(CloudDatasetBase):
         mask = augmented["mask"]
         mask = mask.permute(2, 0, 1)  # HxWxC => CxHxW
         return img, mask
+
+
+class CloudDatasetPseudoTest(CloudDatasetBase):
+
+    img_folder = "gibs"
+
+    def __init__(self, df, data_dir, transforms):
+        super().__init__(df, data_dir, transforms)
+        self.transforms = transforms
+
+    def __getitem__(self, idx):
+        f, img = self.read_rgb(idx)
+        augmented = self.transforms(image=img)
+        img = augmented["image"]
+        return f, img

@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 from copy import deepcopy
 
 import numpy as np
@@ -23,9 +22,10 @@ class EnsembleManager:
         setup_logging(infer_config)
         self.logger = setup_logger(self, infer_config["verbose"])
         self.run_inference = infer_config.get("run_inference", False)
+        train_cfg = infer_config["training"]
+        self.randomiser = globals()[train_cfg["randomiser"]](train_cfg["template"])
 
     def start(self, num_models):
-        # randomiser = ConfigurationRandomiser("experiments/training-template.yml")
         model_checkpoint = None
         train_config = None
         for _ in range(num_models):
@@ -34,11 +34,7 @@ class EnsembleManager:
                 seed = int(time.clock() * 1000)
                 self.logger.info(f"Using seed: {seed}")
                 seed_everything(seed)
-                # train_config = randomiser.generate()
-
-                config_filenames = list(Path("experiments/clas/train").glob("*.yml"))
-                train_config = load_config(np.random.choice(config_filenames))
-                train_config["seed"] = seed
+                train_config = self.randomiser.generate()
 
                 self.logger.info(
                     f"Starting seed {train_config['seed']}: {train_config}"
@@ -62,21 +58,6 @@ class EnsembleManager:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")
                 self.logger.critical(f"Config: {train_config}")
-
-
-class ConfigurationRandomiser:
-    @property
-    def base(self):
-        return deepcopy(self._base)
-
-    def __init__(self, base_config):
-        self._base = load_config(base_config)
-
-    def generate(self):
-        config = self.base
-        for each in [SeedOptions, LossOptions, ModelOptions, OptimizerOptions]:
-            config = each.update(config)
-        return config
 
 
 class ConfigOptionBase:
@@ -104,7 +85,30 @@ class SeedOptions(ConfigOptionBase):
         return config
 
 
-class LossOptions(ConfigOptionBase):
+# -- Segmentation Configurations ------------------------------------------------------
+
+
+class ConfigurationRandomiserSegmentation:
+    @property
+    def base(self):
+        return deepcopy(self._base)
+
+    def __init__(self, base_config):
+        self._base = load_config(base_config)
+
+    def generate(self):
+        config = self.base
+        for each in [
+            SeedOptions,
+            LossOptionsSegmentation,
+            ModelOptionsSegmentation,
+            OptimizerOptionsSegmentation,
+        ]:
+            config = each.update(config)
+        return config
+
+
+class LossOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
         opts = []
@@ -130,7 +134,7 @@ class LossOptions(ConfigOptionBase):
         return config
 
 
-class OptimizerOptions(ConfigOptionBase):
+class OptimizerOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
         return [
@@ -150,7 +154,7 @@ class OptimizerOptions(ConfigOptionBase):
         return config
 
 
-class ModelOptions(ConfigOptionBase):
+class ModelOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
         dropout = float(np.random.uniform(0.10, 0.20))
@@ -158,7 +162,6 @@ class ModelOptions(ConfigOptionBase):
             np.random.choice(
                 [
                     "CutoutTransforms",
-                    "CutoutImgOnlyTransforms",
                     "DistortionTransforms",
                     "CutoutDistortionTransforms",
                     "HeavyResizeTransforms",
@@ -296,6 +299,147 @@ class ModelOptions(ConfigOptionBase):
                 },
                 # fpn - se_resnext101_32x4d
             ]
+        )
+
+    @classmethod
+    def update(cls, config):
+        option = cls.select()
+        config["arch"]["type"] = option["type"]
+        config["arch"]["args"].update(option["args"])
+        config["data_loader"]["args"]["batch_size"] = option["batch_size"]
+        config["augmentation"] = option["augmentation"]
+        return config
+
+
+# -- Classification Configurations ----------------------------------------------------
+
+
+class ConfigurationRandomiserClassification:
+    @property
+    def base(self):
+        return deepcopy(self._base)
+
+    def __init__(self, base_config):
+        self._base = load_config(base_config)
+
+    def generate(self):
+        config = self.base
+        for each in [
+            SeedOptions,
+            ModelOptionsClassification,
+            OptimizerOptionsClassification,
+        ]:
+            config = each.update(config)
+        return config
+
+
+class OptimizerOptionsClassification(ConfigOptionBase):
+    @classmethod
+    def options(cls):
+        return [
+            {
+                "optim": np.random.choice(
+                    [
+                        "RAdam",
+                        # "QHAdamW"
+                    ]
+                ),
+                "lr": np.random.uniform(1e-4, 5e-4),
+            }
+        ]
+
+    @classmethod
+    def update(cls, config):
+        option = cls.select()
+        config["optimizer"]["type"] = str(option["optim"])
+        config["optimizer"]["args"]["lr"] = float(option["lr"])
+        return config
+
+
+class ModelOptionsClassification(ConfigOptionBase):
+    @classmethod
+    def options(cls):
+        # dropout = float(np.random.uniform(0.10, 0.20))
+        transforms = str(
+            np.random.choice(
+                [
+                    "CutoutTransforms",
+                    "DistortionTransforms",
+                    "CutoutDistortionTransforms",
+                    "HeavyResizeTransforms",
+                ]
+            )
+        )
+        return (
+            [
+                # {
+                #     "type": "EfficientNet",
+                #     "args": {"encoder_name": "efficientnet-b0"},
+                #     "batch_size": 16,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 448, "width": 672},
+                #     },
+                # },
+                # {
+                #     "type": "EfficientNet",
+                #     "args": {"encoder_name": "efficientnet-b2"},
+                #     "batch_size": 16,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 384, "width": 576},
+                #     },
+                # },
+                # {
+                #     "type": "EfficientNet",
+                #     "args": {"encoder_name": "efficientnet-b4"},
+                #     "batch_size": 12,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 320, "width": 480},
+                #     },
+                # },
+                {
+                    "type": "TIMM",
+                    "args": {
+                        "encoder_name": str(
+                            np.random.choice(
+                                [
+                                    "resnext50d_32x4d",
+                                    "tv_resnext50_32x4d",
+                                    "ssl_resnext50_32x4d",
+                                ]
+                            )
+                        )
+                    },
+                    "batch_size": 20,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                {
+                    "type": "TIMM",
+                    "args": {
+                        "encoder_name": str(
+                            np.random.choice(
+                                [
+                                    "resnext50d_32x4d",
+                                    "tv_resnext50_32x4d",
+                                    "ssl_resnext50_32x4d",
+                                ]
+                            )
+                        )
+                    },
+                    "batch_size": 16,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 384, "width": 576},
+                    },
+                },
+            ]
+            if GPU == 11
+            else []
         )
 
     @classmethod

@@ -33,7 +33,10 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
         self.dataset_name = dataset_name
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         self.f = h5py.File(self.filename, "a")
-        self.group = self.f.create_group(group_name)
+        try:
+            self.group = self.f.create_group(group_name)
+        except ValueError:
+            self.group = self.f[group_name]
         self.counter = 0
 
     def close(self):
@@ -47,13 +50,14 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
 
 
 class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
-    def __init__(self, filename, dataset_name, score):
-        super().__init__(filename, dataset_name)
+    def __init__(self, filename, group_name, dataset_name, score):
+        super().__init__(filename, group_name, dataset_name)
         try:
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="uint8"
             )
         except Exception as _:  # noqa
+            raise Exception("Skipping as predictions already recorded")
             self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
         self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)
@@ -76,8 +80,8 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
 
 
 class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
-    def __init__(self, filename, dataset_name, score):
-        super().__init__(filename, dataset_name)
+    def __init__(self, filename, group_name, dataset_name, score):
+        super().__init__(filename, group_name, dataset_name)
         try:
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C), dtype="uint8"
@@ -110,65 +114,128 @@ class HDF5AverageWriterBase(HDF5ReaderWriterBase):
     def __init__(self, verbose=2):
         self.logger = setup_logger(self, verbose)
 
+    def average(self, pred_filename, avg_filename):
+        self.logger.info(f'Reducing: "{pred_filename}" to "{avg_filename}"')
+        self.average_groups(pred_filename, avg_filename)
+        self.average_all(avg_filename)
+
 
 class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
     def __init__(self, verbose=2):
         super().__init__(verbose)
 
-    def average(self, pred_filename, avg_filename):
-        self.logger.info(f'Reducing: "{pred_filename}" to "{avg_filename}"')
+    def average_groups(self, pred_filename, avg_filename):
         with h5py.File(pred_filename, "r") as src, h5py.File(avg_filename, "w") as dst:
-            scores = [src[k].attrs["mean_dice"] for k in src.keys()]
-            weights = np.array([self.get_weight(s) for s in scores])
-            weights = weights[:, np.newaxis, np.newaxis, np.newaxis]
-            n_predictions = weights.shape[0]
-            self.logger.info(f"Averaging {n_predictions} predictions")
+            for g in src.keys():
+                scores = [src[g][k].attrs["score"] for k in src[g].keys()]
+                weights = np.array([self.get_weight_model(s) for s in scores])
+                weights = weights[:, np.newaxis, np.newaxis, np.newaxis]
+                n_pred = weights.shape[0]
+                self.logger.info(f"Averaging {n_pred} predictions from {g}")
 
-            dset = dst.create_dataset(
+                dset = dst.create_dataset(
+                    g, (self.N, self.C, self.H, self.W), dtype="float32"
+                )
+
+                for n in tqdm(range(self.N), total=self.N):
+                    pred_stack = np.stack(
+                        [src[g][k][n, :, :, :] for k in src[g].keys()], axis=0
+                    )
+                    pred_stack = pred_stack * weights / 100  # undo scaling
+                    pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
+                    # TODO: std calculation?
+                    dset[n, :, :, :] = pred_avg
+        self.logger.info(f"Finished averaging model groups.")
+
+    def average_all(self, avg_filename):
+        with h5py.File(avg_filename, "a") as h5:
+            group_keys = [k for k in h5.keys() if k != self.dataset_name]
+            weights = np.array([self.get_weight_group(k) for k in group_keys])
+            weights = weights[:, np.newaxis, np.newaxis, np.newaxis]
+            self.logger.info(f"Averaging {group_keys}")
+
+            dset = h5.create_dataset(
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="float32"
             )
 
             for n in tqdm(range(self.N), total=self.N):
-                pred_stack = np.stack([src[k][n, :, :, :] for k in src.keys()], axis=0)
-                pred_stack = pred_stack * weights / 100  # undo scaling
+                pred_stack = np.stack([h5[k][n, :, :, :] for k in group_keys], axis=0)
+                pred_stack = pred_stack * weights
                 pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
                 # TODO: std calculation?
                 dset[n, :, :, :] = pred_avg
+        self.logger.info(f"Finished averaging all.")
 
-        self.logger.info(f"Averaging complete.")
-
-    def get_weight(self, score):
+    def get_weight_model(self, score):
         weight = max(0, score - 0.60)
         return weight
+
+    def get_weight_group(self, name):
+        weights = {
+            "efficientnet-b0-FPN": 1.0,
+            "efficientnet-b0-Unet": 0.5,
+            "efficientnet-b2-FPN": 1.0,  # 0.6666
+            "efficientnet-b2-Unet": 1.0,
+            "efficientnet-b5-FPN": 1.0,  # 0.6665
+            "efficientnet-b5-Unet": 0.5,
+            "efficientnet-b6-FPN": 0.1,
+            "resnext101_32x8d-FPN": 2.0,  # 0.6718
+            "resnext101_32x8d-Unet": 1.0,
+            "inceptionresnetv2-Unet": 0.1,
+            "deeplabv3_resnet101-DeepLabV3": 0.5,  # 0.6651
+        }
+        w = weights.get(name, 0)
+        return w
 
 
 class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
     def __init__(self, verbose=2):
         super().__init__(verbose)
 
-    def average(self, pred_filename, avg_filename):
-        self.logger.info(f'Reducing: "{pred_filename}" to "{avg_filename}"')
+    def average_groups(self, pred_filename, avg_filename):
         with h5py.File(pred_filename, "r") as src, h5py.File(avg_filename, "w") as dst:
-            scores = [src[k].attrs["score"] for k in src.keys()]
-            weights = np.array([self.get_weight(s) for s in scores])
-            weights = weights[:, np.newaxis]
-            n_predictions = weights.shape[0]
-            self.logger.info(f"Averaging {n_predictions} predictions")
+            for g in src.keys():
+                scores = [src[g][k].attrs["score"] for k in src[g].keys()]
+                weights = np.array([self.get_weight_model(s) for s in scores])
+                weights = weights[:, np.newaxis]
+                n_pred = weights.shape[0]
+                self.logger.info(f"Averaging {n_pred} predictions from {g}")
 
-            dset = dst.create_dataset(
+                dset = dst.create_dataset(g, (self.N, self.C), dtype="float32")
+
+                for n in tqdm(range(self.N), total=self.N):
+                    pred_stack = np.stack(
+                        [src[g][k][n, :] for k in src[g].keys()], axis=0
+                    )
+                    pred_stack = pred_stack * weights / 100  # undo scaling
+                    pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
+                    # TODO: std calculation?
+                    dset[n, :] = pred_avg
+        self.logger.info(f"Finished averaging model groups.")
+
+    def average_all(self, avg_filename):
+        with h5py.File(avg_filename, "a") as h5:
+            group_keys = [k for k in h5.keys() if k != self.dataset_name]
+            weights = np.array([self.get_weight_group(k) for k in group_keys])
+            weights = weights[:, np.newaxis]
+            self.logger.info(f"Averaging {group_keys}")
+
+            dset = h5.create_dataset(
                 self.dataset_name, (self.N, self.C), dtype="float32"
             )
 
             for n in tqdm(range(self.N), total=self.N):
-                pred_stack = np.stack([src[k][n, :] for k in src.keys()], axis=0)
-                pred_stack = pred_stack * weights / 100  # undo scaling
+                pred_stack = np.stack([h5[k][n, :] for k in group_keys], axis=0)
+                pred_stack = pred_stack * weights
                 pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
                 # TODO: std calculation?
                 dset[n, :] = pred_avg
+        self.logger.info(f"Finished averaging all.")
 
-        self.logger.info(f"Averaging complete.")
+    def get_weight_model(self, score):
+        return 1
 
-    def get_weight(self, score):
+    def get_weight_group(self, group_name):
         return 1
 
 
@@ -178,11 +245,11 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
 class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
-    # min_sizes = np.array([9573, 9670, 9019, 7885])
     t0 = np.array([9573, 9670, 9019, 7885]) / 5
     c_factor = 9
-    top_thresholds = np.array([0.57, 0.57, 0.57, 0.57])
-    bot_thresholds = np.array([0.42, 0.42, 0.42, 0.42])
+    # top_thresholds = np.array([0.57, 0.57, 0.57, 0.57])
+    top_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
+    bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, verbose=2):
         self.logger = setup_logger(self, verbose)
@@ -190,6 +257,7 @@ class PostProcessor(HDF5ReaderWriterBase):
     def process(self, seg_filename, clas_filename, data_dir, submission_filename):
         self.logger.info(f'PostProcessing: "{seg_filename}", "{clas_filename}"')
         self.logger.info(f"t0: {self.t0}")
+        self.logger.info(f"c_factor: {self.c_factor}")
         self.logger.info(f"top_thresholds: {self.top_thresholds}")
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
         sample_df = pd.read_csv(Path(data_dir) / self.sample_csv)

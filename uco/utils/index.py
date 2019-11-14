@@ -46,28 +46,39 @@ class Indexer:
             run_dir / cls.checkpoint_partial_path, map_location=torch.device("cpu")
         )
 
-        best_score = checkpoint["monitor_best"].item()
-        train_cfg = checkpoint["config"]
+        best_score = checkpoint["monitor_best"]
+        if isinstance(best_score, torch.Tensor):
+            best_score = best_score.item()
+        cfg = checkpoint["config"]
 
         settings = {
-            "mean_dice": best_score,
+            "score": best_score,
             "run": run_dir.name,
-            "encoder": train_cfg["arch"]["args"]["encoder_name"],
-            "decoder": train_cfg["arch"]["type"],
-            "dropout": train_cfg["arch"]["args"].get("dropout", 0),
-            "augs": train_cfg["augmentation"]["type"],
-            "img_height": train_cfg["augmentation"]["args"]["height"],
-            "img_width": train_cfg["augmentation"]["args"]["width"],
-            "batch_size": train_cfg["data_loader"]["args"]["batch_size"],
-            "bce_weight": train_cfg["loss"]["args"]["bce_weight"],
-            "dice_weight": train_cfg["loss"]["args"].get("dice_weight", 0),
-            "lovasz_weight": train_cfg["loss"]["args"].get("lovasz_weight", 0),
-            "optimizer": train_cfg["optimizer"]["type"],
-            "encoder_lr": train_cfg["optimizer"]["encoder"]["lr"],
-            "decoder_lr": train_cfg["optimizer"]["decoder"]["lr"],
-            "anneal_start": train_cfg["lr_scheduler"]["args"]["start_anneal"],
-            "anneal_end": train_cfg["lr_scheduler"]["args"]["n_epochs"],
-            "encoder_weights": train_cfg["arch"]["args"]["encoder_weights"],
-            "seed": train_cfg["seed"],
+            "seed": cfg["seed"],
+            "encoder": cfg["arch"]["args"].get("encoder_name", ""),
+            "decoder": cfg["arch"]["type"],
+            "dropout": cfg["arch"]["args"].get("dropout", 0),
+            "encoder_weights": cfg["arch"]["args"].get("encoder_weights", ""),
+            "augs": cfg["augmentation"]["type"],
+            "img_height": cfg["augmentation"]["args"]["height"],
+            "img_width": cfg["augmentation"]["args"]["width"],
+            "batch_size": cfg["data_loader"]["args"]["batch_size"],
+            "bce_weight": cfg["loss"]["args"].get("bce_weight", 1),
+            "dice_weight": cfg["loss"]["args"].get("dice_weight", 0),
+            "lovasz_weight": cfg["loss"]["args"].get("lovasz_weight", 0),
+            "optimizer": cfg["optimizer"]["type"],
+            "anneal_start": cfg["lr_scheduler"]["args"]["start_anneal"],
+            "anneal_end": cfg["lr_scheduler"]["args"]["n_epochs"],
         }
+        if "encoder" in cfg["optimizer"].keys():
+            settings.update(
+                {
+                    "encoder_lr": cfg["optimizer"]["encoder"]["lr"],
+                    "decoder_lr": cfg["optimizer"]["decoder"]["lr"],
+                }
+            )
+        else:
+            settings.update(
+                {"encoder_lr": cfg["optimizer"]["args"]["lr"], "decoder_lr": 0}
+            )
         return settings

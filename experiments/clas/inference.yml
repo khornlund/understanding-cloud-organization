@@ -7,6 +7,10 @@ tensorboard: false
 run_inference: true
 score_threshold: 0.0  # no threshold
 
+training:
+  randomiser: ConfigurationRandomiserClassification
+  template: experiments/clas/training-template.yml
+
 data_loader:
   type: CloudClasTestDataLoader
   args:
