@@ -16,7 +16,7 @@ class HDF5ReaderWriterBase:
     H = 350
     W = 525
     C = 4
-    N = 3698
+    # N = 3698
 
 
 # -- Writing raw predictions ----------------------------------------------------------
@@ -27,10 +27,11 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
     Handles writing prediction output to HDF5 by rounding to scaled uint8.
     """
 
-    def __init__(self, filename, group_name, dataset_name):
+    def __init__(self, filename, group_name, dataset_name, n_imgs):
         self.filename = Path(filename)
         self.group_name = group_name
         self.dataset_name = dataset_name
+        self.N = n_imgs
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         self.f = h5py.File(self.filename, "a")
         try:
@@ -50,8 +51,8 @@ class HDF5PredictionWriterBase(HDF5ReaderWriterBase):
 
 
 class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
-    def __init__(self, filename, group_name, dataset_name, score):
-        super().__init__(filename, group_name, dataset_name)
+    def __init__(self, filename, group_name, dataset_name, n_imgs, score):
+        super().__init__(filename, group_name, dataset_name, n_imgs)
         try:
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="uint8"
@@ -80,8 +81,8 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
 
 
 class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
-    def __init__(self, filename, group_name, dataset_name, score):
-        super().__init__(filename, group_name, dataset_name)
+    def __init__(self, filename, group_name, dataset_name, n_imgs, score):
+        super().__init__(filename, group_name, dataset_name, n_imgs)
         try:
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C), dtype="uint8"
@@ -111,7 +112,8 @@ class HDF5AverageWriterBase(HDF5ReaderWriterBase):
 
     dataset_name = "average"
 
-    def __init__(self, verbose=2):
+    def __init__(self, n_imgs, verbose=2):
+        self.N = n_imgs
         self.logger = setup_logger(self, verbose)
 
     def average(self, pred_filename, avg_filename):
@@ -121,8 +123,8 @@ class HDF5AverageWriterBase(HDF5ReaderWriterBase):
 
 
 class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
-    def __init__(self, verbose=2):
-        super().__init__(verbose)
+    def __init__(self, n_imgs, verbose=2):
+        super().__init__(n_imgs, verbose)
 
     def average_groups(self, pred_filename, avg_filename):
         with h5py.File(pred_filename, "r") as src, h5py.File(avg_filename, "w") as dst:
@@ -172,25 +174,25 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
 
     def get_weight_group(self, name):
         weights = {
-            "efficientnet-b0-FPN": 1.0,
+            "efficientnet-b0-FPN": 1.0,  # 0.6674
             "efficientnet-b0-Unet": 0.5,
             "efficientnet-b2-FPN": 1.0,  # 0.6666
-            "efficientnet-b2-Unet": 1.0,
+            "efficientnet-b2-Unet": 1.0,  # 0.6694
             "efficientnet-b5-FPN": 1.0,  # 0.6665
-            "efficientnet-b5-Unet": 0.5,
+            "efficientnet-b5-Unet": 1.0,  # 0.6651
             "efficientnet-b6-FPN": 0.1,
-            "resnext101_32x8d-FPN": 2.0,  # 0.6718
-            "resnext101_32x8d-Unet": 1.0,
+            "resnext101_32x8d-FPN": 2.5,  # 0.6718
+            "resnext101_32x8d-Unet": 1.0,  # 0.6670
             "inceptionresnetv2-Unet": 0.1,
-            "deeplabv3_resnet101-DeepLabV3": 0.5,  # 0.6651
+            "deeplabv3_resnet101-DeepLabV3": 1.0,  # 0.6651
         }
         w = weights.get(name, 0)
         return w
 
 
 class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
-    def __init__(self, verbose=2):
-        super().__init__(verbose)
+    def __init__(self, n_imgs, verbose=2):
+        super().__init__(n_imgs, verbose)
 
     def average_groups(self, pred_filename, avg_filename):
         with h5py.File(pred_filename, "r") as src, h5py.File(avg_filename, "w") as dst:
@@ -247,11 +249,11 @@ class PostProcessor(HDF5ReaderWriterBase):
     sample_csv = "sample_submission.csv"
     t0 = np.array([9573, 9670, 9019, 7885]) / 5
     c_factor = 9
-    # top_thresholds = np.array([0.57, 0.57, 0.57, 0.57])
-    top_thresholds = np.array([0.50, 0.50, 0.50, 0.50])
-    bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
+    top_thresholds = np.array([0.56, 0.56, 0.56, 0.56])
+    bot_thresholds = np.array([0.42, 0.42, 0.42, 0.42])
 
-    def __init__(self, verbose=2):
+    def __init__(self, n_imgs, verbose=2):
+        self.N = n_imgs
         self.logger = setup_logger(self, verbose)
 
     def process(self, seg_filename, clas_filename, data_dir, submission_filename):

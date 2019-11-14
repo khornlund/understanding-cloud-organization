@@ -254,7 +254,7 @@ class CloudSegPseudoDataLoader(DataLoaderBase):
             )
 
 
-class CloudSegPseudoTestDataLoader(CloudSegTestDataLoader):
+class CloudSegPseudoTestDataLoader(DataLoaderBase):
 
     test_csv = "gibs.csv"
 

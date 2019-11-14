@@ -372,71 +372,71 @@ class ModelOptionsClassification(ConfigOptionBase):
         )
         return (
             [
-                # {
-                #     "type": "EfficientNet",
-                #     "args": {"encoder_name": "efficientnet-b0"},
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 448, "width": 672},
-                #     },
-                # },
-                # {
-                #     "type": "EfficientNet",
-                #     "args": {"encoder_name": "efficientnet-b2"},
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 384, "width": 576},
-                #     },
-                # },
-                # {
-                #     "type": "EfficientNet",
-                #     "args": {"encoder_name": "efficientnet-b4"},
-                #     "batch_size": 12,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # },
                 {
-                    "type": "TIMM",
-                    "args": {
-                        "encoder_name": str(
-                            np.random.choice(
-                                [
-                                    "resnext50d_32x4d",
-                                    "tv_resnext50_32x4d",
-                                    "ssl_resnext50_32x4d",
-                                ]
-                            )
-                        )
-                    },
-                    "batch_size": 20,
+                    "type": "EfficientNet",
+                    "args": {"encoder_name": "efficientnet-b0"},
+                    "batch_size": 16,
                     "augmentation": {
                         "type": transforms,
-                        "args": {"height": 320, "width": 480},
+                        "args": {"height": 448, "width": 672},
                     },
                 },
                 {
-                    "type": "TIMM",
-                    "args": {
-                        "encoder_name": str(
-                            np.random.choice(
-                                [
-                                    "resnext50d_32x4d",
-                                    "tv_resnext50_32x4d",
-                                    "ssl_resnext50_32x4d",
-                                ]
-                            )
-                        )
-                    },
+                    "type": "EfficientNet",
+                    "args": {"encoder_name": "efficientnet-b2"},
                     "batch_size": 16,
                     "augmentation": {
                         "type": transforms,
                         "args": {"height": 384, "width": 576},
                     },
                 },
+                {
+                    "type": "EfficientNet",
+                    "args": {"encoder_name": "efficientnet-b4"},
+                    "batch_size": 12,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                # {
+                #     "type": "TIMM",
+                #     "args": {
+                #         "encoder_name": str(
+                #             np.random.choice(
+                #                 [
+                #                     "resnext50d_32x4d",
+                #                     "tv_resnext50_32x4d",
+                #                     "ssl_resnext50_32x4d",
+                #                 ]
+                #             )
+                #         )
+                #     },
+                #     "batch_size": 20,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 320, "width": 480},
+                #     },
+                # },
+                # {
+                #     "type": "TIMM",
+                #     "args": {
+                #         "encoder_name": str(
+                #             np.random.choice(
+                #                 [
+                #                     "resnext50d_32x4d",
+                #                     "tv_resnext50_32x4d",
+                #                     "ssl_resnext50_32x4d",
+                #                 ]
+                #             )
+                #         )
+                #     },
+                #     "batch_size": 16,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 384, "width": 576},
+                #     },
+                # },
             ]
             if GPU == 11
             else []

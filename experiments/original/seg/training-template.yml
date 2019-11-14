@@ -1,5 +1,5 @@
 short_name: sever
-save_dir: saved/
+save_dir: saved/original/seg
 verbose: 2
 seed: 1234
 target_devices: [0]
@@ -12,7 +12,6 @@ arch:
     in_channels: 3
 
 data_loader:
-  # type: CloudSegPseudoDataLoader
   type: CloudSegDataLoader
   args:
     # batch_size: 16
@@ -20,7 +19,6 @@ data_loader:
     nworkers: 8
     shuffle: true
     validation_split: 0.2
-    # n_pseudo_per_batch: 2
 
 loss:
   type: BCEDiceLoss

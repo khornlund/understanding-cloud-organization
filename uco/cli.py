@@ -19,6 +19,10 @@ from uco.utils import (
 )
 
 
+DEFAULT_SEG_INFERENCE = "experiments/original/seg/inference.yml"
+DEFAULT_CLAS_INFERENCE = "experiments/original/clas/inference.yml"
+
+
 @click.group()
 def cli():
     """
@@ -30,7 +34,7 @@ def cli():
 @click.option(
     "-c",
     "--config-filename",
-    default=["experiments/seg/config.yml"],
+    default=["experiments/original/seg/train.yml"],
     multiple=True,
     help=(
         "Path to training configuration file. If multiple are provided, runs will be "
@@ -57,7 +61,7 @@ def train(config_filename, resume):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/seg/inference.yml",
+    default=DEFAULT_SEG_INFERENCE,
     help="Path to inference configuration",
 )
 @click.option(
@@ -78,7 +82,7 @@ def reindex(folder):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/seg/inference.yml",
+    default=DEFAULT_SEG_INFERENCE,
     help="Path to training configuration file.",
 )
 @click.option(
@@ -101,13 +105,13 @@ def predict(config_filename, model_checkpoint):
     "-f",
     "--folder",
     type=str,
-    default="saved/training",
+    default="saved/original/seg/training",
     help="Folder containing checkpoints",
 )
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/seg/inference.yml",
+    default=DEFAULT_SEG_INFERENCE,
     help="Path to inference configuration file.",
 )
 def predict_all(folder, config_filename):
@@ -125,37 +129,44 @@ def predict_all(folder, config_filename):
 @click.option(
     "-c",
     "--config-filename",
-    default="experiments/seg/inference.yml",
+    default=DEFAULT_SEG_INFERENCE,
     help="Path to training configuration file.",
 )
 def average(config_filename):
     config = load_config(config_filename)
     setup_logging(config)
-    getattr(h5, config["average"])(verbose=config["verbose"]).average(
-        config["output"]["raw"], config["output"]["avg"]
-    )
+    getattr(h5, config["average"])(
+        config["output"]["N"], verbose=config["verbose"]
+    ).average(config["output"]["raw"], config["output"]["avg"])
 
 
 @cli.command()
 @click.option(
-    "-c",
-    "--config-filename",
-    default="experiments/seg/inference.yml",
-    help="Path to training configuration file.",
+    "-s",
+    "--seg-config-filename",
+    default=DEFAULT_SEG_INFERENCE,
+    help="Path to segmentation inference configuration file.",
 )
-def post_process(config_filename):
-    config = load_config(config_filename)
-    setup_logging(config)
-    h5.PostProcessor(verbose=2).process(
-        "data/predictions/avg-seg-predictions.h5",
-        "data/predictions/avg-clas-predictions.h5",
+@click.option(
+    "-c",
+    "--clas-config-filename",
+    default=DEFAULT_CLAS_INFERENCE,
+    help="Path to classification inference configuration file.",
+)
+def post_process(seg_config_filename, clas_config_filename):
+    seg_config = load_config(seg_config_filename)
+    clas_config = load_config(clas_config_filename)
+    setup_logging(seg_config)
+    h5.PostProcessor(seg_config["output"]["N"], verbose=2).process(
+        seg_config["output"]["avg"],
+        clas_config["output"]["avg"],
         "data/raw/",
-        "data/predictions/submission.csv",
+        seg_config["output"]["sub"],
     )
 
 
 @cli.command()
-@click.option("-f", "--filename", type=str, default="data/predictions/submission.csv")
+@click.option("-f", "--filename", type=str, default="data/original/submission.csv")
 @click.option("-n", "--name", type=str, required=True)
 def submit(filename, name):
     kaggle_submit(filename, name)
@@ -163,11 +174,7 @@ def submit(filename, name):
 
 @cli.command()
 @click.option(
-    "-f",
-    "--folder",
-    type=str,
-    default="saved/training",
-    help="Folder containing checkpoints",
+    "-f", "--folder", type=str, required=True, help="Folder containing checkpoints"
 )
 @click.option("-s", "--score-cutoff", default=0.60, help="delete runs with low scores")
 def prune_seg(folder, score_cutoff):
@@ -189,11 +196,7 @@ def prune_seg(folder, score_cutoff):
 
 @cli.command()
 @click.option(
-    "-f",
-    "--folder",
-    type=str,
-    default="saved/clas/training",
-    help="Folder containing checkpoints",
+    "-f", "--folder", type=str, required=True, help="Folder containing checkpoints"
 )
 @click.option("-s", "--score-cutoff", default=0.495, help="delete runs with high loss")
 def prune_clas(folder, score_cutoff):
@@ -215,7 +218,7 @@ def prune_clas(folder, score_cutoff):
 
 @cli.command()
 @click.option(
-    "-s", "--submission-filename", type=str, default="data/predictions/submission.csv"
+    "-s", "--submission-filename", type=str, default="data/pseudo/submission.csv"
 )
 @click.option("-d", "--data-directory", type=str, default="data/raw")
 def create_pseudo(submission_filename, data_directory):

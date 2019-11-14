@@ -122,7 +122,8 @@ class MapDownloader:
         for domain in [DomainA, DomainB, DomainC]:
             for dt in TimeGenerator.for_domain(domain):
                 for layer in self.layers:
-                    filename = self.data_dir / f"{dt}_{domain.name}_{layer}.jpg"
+                    filename = f"{dt}-{domain.name}-{layer}.jpg".replace("_", "-")
+                    filename = self.data_dir / filename
                     requests.append(
                         {
                             "wms": wms,

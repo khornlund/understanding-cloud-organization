@@ -1,0 +1,31 @@
+name: inference
+save_dir: saved/pseudo/clas
+seed: 1234
+device: 1
+verbose: 2
+tensorboard: false
+run_inference: true
+score_threshold: 0.0  # no threshold
+
+training:
+  randomiser: ConfigurationRandomiserClassification
+  template: experiments/pseudo/clas/training-template.yml
+
+data_loader:
+  type: CloudClasTestDataLoader
+  args:
+    batch_size: 16
+    data_dir: data/raw/
+    nworkers: 8
+    pin_memory: true
+
+tta: ClassificationTTAWrapper
+write: HDF5ClasPredictionWriter
+average: HDF5ClasAverageWriterBase
+
+output:
+  N: 4211
+  raw: data/pseudo/raw-clas-predictions.h5
+  avg: data/pseudo/avg-clas-predictions.h5
+  sub: data/pseudo/submission.csv
+  log: data/pseudo/log.csv

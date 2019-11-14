@@ -1,5 +1,5 @@
 name: inference
-save_dir: saved/
+save_dir: saved/pseudo/seg
 seed: 1234
 device: 1
 verbose: 2
@@ -9,7 +9,7 @@ score_threshold: 0.605
 
 training:
   randomiser: ConfigurationRandomiserSegmentation
-  template: experiments/seg/training-template.yml
+  template: experiments/pseudo/seg/training-template.yml
 
 data_loader:
   type: CloudSegPseudoTestDataLoader
@@ -24,7 +24,8 @@ write: HDF5SegPredictionWriter
 average: HDF5SegAverageWriterBase
 
 output:
-  raw: data/predictions/raw-pseudo-seg-predictions.h5
-  avg: data/predictions/avg-pseudo-seg-predictions.h5
-  sub: data/predictions/submission.csv
-  log: data/predictions/log.csv
+  N: 4211
+  raw: data/pseudo/raw-seg-predictions.h5
+  avg: data/pseudo/avg-seg-predictions.h5
+  sub: data/pseudo/submission.csv
+  log: data/pseudo/log.csv

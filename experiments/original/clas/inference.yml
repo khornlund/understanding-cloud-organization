@@ -1,5 +1,5 @@
 name: inference
-save_dir: saved/
+save_dir: saved/original/clas
 seed: 1234
 device: 1
 verbose: 2
@@ -9,7 +9,7 @@ score_threshold: 0.0  # no threshold
 
 training:
   randomiser: ConfigurationRandomiserClassification
-  template: experiments/clas/training-template.yml
+  template: experiments/original/clas/training-template.yml
 
 data_loader:
   type: CloudClasTestDataLoader
@@ -24,7 +24,8 @@ write: HDF5ClasPredictionWriter
 average: HDF5ClasAverageWriterBase
 
 output:
-  raw: data/predictions/raw-clas-predictions.h5
-  avg: data/predictions/avg-clas-predictions.h5
-  sub: data/predictions/submission.csv
-  log: data/predictions/log.csv
+  N: 3698
+  raw: data/original/raw-clas-predictions.h5
+  avg: data/original/avg-clas-predictions.h5
+  sub: data/original/submission.csv
+  log: data/original/log.csv

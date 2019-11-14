@@ -1,5 +1,5 @@
 short_name: sever
-save_dir: saved/clas
+save_dir: saved/original/clas
 verbose: 2
 seed: 12145
 target_devices: [0]
