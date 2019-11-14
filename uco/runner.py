@@ -148,7 +148,7 @@ class TrainingManager(ManagerBase):
 
     def setup_param_groups_segmentation(self, model: nn.Module, config: dict) -> dict:
         """
-        Helper to remove weight decay from bias parameters.
+        Helper to apply options to param groups.
         """
         encoder_opts = config["encoder"]
         decoder_opts = config["decoder"]
@@ -178,14 +178,14 @@ class TrainingManager(ManagerBase):
         params = [
             {"params": encoder_weight_params, **encoder_opts},
             {"params": decoder_weight_params, **decoder_opts},
-            {"params": encoder_bias_params, "lr": encoder_opts["lr"]},
-            {"params": decoder_bias_params, "lr": decoder_opts["lr"]},
+            {"params": encoder_bias_params, **encoder_opts},
+            {"params": decoder_bias_params, **decoder_opts},
         ]
         return params
 
     def setup_param_groups_classifier(self, model: nn.Module, config: dict) -> dict:
         """
-        Helper to remove weight decay from bias parameters.
+        Helper to apply options to param groups.
         """
         weight_params = []
         bias_params = []
@@ -201,7 +201,7 @@ class TrainingManager(ManagerBase):
 
         params = [
             {"params": weight_params, **config["args"]},
-            {"params": bias_params, "lr": config["args"]["lr"]},
+            {"params": bias_params, **config["args"]},
         ]
         return params
 
@@ -279,6 +279,7 @@ class InferenceManager(ManagerBase):
             filename=config["output"]["raw"],
             group_name=group_name,
             dataset_name=Path(model_checkpoint).parent.parent.name,
+            n_imgs=config["output"]["N"],
             score=score,
         )
         return writer
