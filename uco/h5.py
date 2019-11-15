@@ -60,8 +60,8 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="uint8"
             )
-        except Exception as _:  # noqa
-            # raise Exception("Skipping as predictions already recorded")
+        except Exception:
+            raise Exception("Skipping as predictions already recorded")
             self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
         self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)
@@ -90,7 +90,8 @@ class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
             self.dset = self.group.create_dataset(
                 self.dataset_name, (self.N, self.C), dtype="uint8"
             )
-        except Exception as _:  # noqa
+        except Exception:
+            raise Exception("Skipping as predictions already recorded")
             self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
 
@@ -157,11 +158,16 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
             group_keys = [k for k in h5.keys() if k != self.dataset_name]
             weights = np.array([self.get_weight_group(k) for k in group_keys])
             weights = weights[:, np.newaxis, np.newaxis, np.newaxis]
-            self.logger.info(f"Averaging {group_keys}")
 
-            dset = h5.create_dataset(
-                self.dataset_name, (self.N, self.C, self.H, self.W), dtype="float32"
+            dset = (
+                h5.create_dataset(
+                    self.dataset_name, (self.N, self.C, self.H, self.W), dtype="float32"
+                )
+                if self.dataset_name not in h5.keys()
+                else h5[self.dataset_name]
             )
+
+            self.logger.info(f"Averaging {group_keys} to {dset.name}")
 
             for n in tqdm(range(self.N), total=self.N):
                 pred_stack = np.stack([h5[k][n, :, :, :] for k in group_keys], axis=0)
@@ -184,12 +190,13 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
             "efficientnet-b5-FPN": 1.0,  # 0.6665
             "efficientnet-b5-Unet": 1.0,  # 0.6651
             "efficientnet-b6-FPN": 0.1,
-            "resnext101_32x8d-FPN": 2.5,  # 0.6718
-            "resnext101_32x8d-Unet": 1.0,  # 0.6670
+            "resnext101_32x8d-FPN": 3.0,  # 0.6718
+            "resnext101_32x8d-Unet": 1.5,  # 0.6670
             "inceptionresnetv2-Unet": 0.1,
-            "deeplabv3_resnet101-DeepLabV3": 1.0,  # 0.6651
+            "deeplabv3_resnet101-DeepLabV3": 1.5,  # 0.6651
         }
         w = weights.get(name, 0)
+        self.logger.info(f"Using weight {w} for {name}")
         return w
 
 
@@ -252,20 +259,22 @@ class PostProcessor(HDF5ReaderWriterBase):
     sample_csv = "sample_submission.csv"
     t0 = np.array([9573, 9670, 9019, 7885]) / 5
     c_factor = 9
-    top_thresholds = np.array([0.56, 0.56, 0.56, 0.56])
-    bot_thresholds = np.array([0.42, 0.42, 0.42, 0.42])
+    top_thresholds = np.array([0.56, 0.57, 0.555, 0.55])
+    bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, n_imgs, verbose=2):
         self.N = n_imgs
         self.logger = setup_logger(self, verbose)
 
-    def process(self, seg_filename, clas_filename, data_dir, submission_filename):
+    def process(
+        self, seg_filename, clas_filename, sample_submission, submission_filename
+    ):
         self.logger.info(f'PostProcessing: "{seg_filename}", "{clas_filename}"')
         self.logger.info(f"t0: {self.t0}")
         self.logger.info(f"c_factor: {self.c_factor}")
         self.logger.info(f"top_thresholds: {self.top_thresholds}")
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
-        sample_df = pd.read_csv(Path(data_dir) / self.sample_csv)
+        sample_df = pd.read_csv(sample_submission)
 
         throwaway_counter = np.array([0, 0, 0, 0])
         positive_counter = np.array([0, 0, 0, 0])

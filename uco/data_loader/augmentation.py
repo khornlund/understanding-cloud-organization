@@ -8,10 +8,6 @@ from albumentations.pytorch import ToTensorV2
 from .process import IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH  # noqa
 
 
-# divisible by 2^5
-IMAGE_ROUNDED_HEIGHT = 1376
-IMAGE_ROUNDED_WIDTH = 2080
-
 VALID_IMG_SIZES = [
     (64, 96),
     (128, 192),
@@ -64,7 +60,7 @@ class NormalizeBase(AugmentationFactoryBase):
     def build_test(self):
         return A.Compose(
             [
-                A.RandomCrop(IMAGE_ROUNDED_HEIGHT, IMAGE_ROUNDED_WIDTH),
+                A.RandomCrop(IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH),
                 A.Normalize(self.MEANS, self.STDS),
                 ToTensorV2(),
             ]

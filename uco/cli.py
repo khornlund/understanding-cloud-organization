@@ -160,7 +160,7 @@ def post_process(seg_config_filename, clas_config_filename):
     h5.PostProcessor(seg_config["output"]["N"], verbose=2).process(
         seg_config["output"]["avg"],
         clas_config["output"]["avg"],
-        "data/raw/",
+        seg_config["output"]["img"],
         seg_config["output"]["sub"],
     )
 
@@ -176,7 +176,7 @@ def submit(filename, name):
 @click.option(
     "-f", "--folder", type=str, required=True, help="Folder containing checkpoints"
 )
-@click.option("-s", "--score-cutoff", default=0.60, help="delete runs with low scores")
+@click.option("-s", "--score-cutoff", default=0.605, help="delete runs with low scores")
 def prune_seg(folder, score_cutoff):
     checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))[:-2]
     counter = 0
@@ -198,7 +198,7 @@ def prune_seg(folder, score_cutoff):
 @click.option(
     "-f", "--folder", type=str, required=True, help="Folder containing checkpoints"
 )
-@click.option("-s", "--score-cutoff", default=0.495, help="delete runs with high loss")
+@click.option("-s", "--score-cutoff", default=0.490, help="delete runs with high loss")
 def prune_clas(folder, score_cutoff):
     checkpoints = sorted(list(Path(folder).glob("**/*model_best.pth")))[:-2]
     counter = 0

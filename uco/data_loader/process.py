@@ -1,8 +1,5 @@
-from pathlib import Path
-
 import cv2
 import numpy as np
-import pandas as pd
 
 
 IMAGE_ORIGINAL_HEIGHT = 1400
@@ -114,11 +111,3 @@ class RLEConverter:
         mask = rle.to_mask()
         mask = cv2.resize(mask, (RLEInput.MASK_W, RLEInput.MASK_H))
         return str(RLEInput.from_mask(mask))
-
-
-class PseudoLabelBuilder:
-    @classmethod
-    def build(cls, submission_filename, data_dir):
-        df = pd.read_csv(submission_filename)
-        df["EncodedPixels"] = df["EncodedPixels"].apply(RLEConverter.upscale_single)
-        df.to_csv(Path(data_dir) / "pseudo.csv", index=False)

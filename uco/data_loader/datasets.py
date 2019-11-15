@@ -91,7 +91,7 @@ class CloudClasDatasetTrainVal(CloudDatasetBase):
 
 class CloudDatasetPseudoTrain(CloudDatasetBase):
 
-    img_folder = "gibs"
+    img_folder = "joined_images"
 
     def __init__(self, df, data_dir, transforms):
         super().__init__(df, data_dir, transforms)
