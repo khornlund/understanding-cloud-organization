@@ -11,6 +11,9 @@ from uco.data_loader import RLEOutput
 from uco.utils import setup_logger
 
 
+HENG_PROBE = [1864, 1508, 1982, 2382]
+
+
 class HDF5ReaderWriterBase:
 
     H = 350
@@ -58,7 +61,7 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
                 self.dataset_name, (self.N, self.C, self.H, self.W), dtype="uint8"
             )
         except Exception as _:  # noqa
-            raise Exception("Skipping as predictions already recorded")
+            # raise Exception("Skipping as predictions already recorded")
             self.dset = self.group[self.dataset_name]
         self.dset.attrs["score"] = score
         self.resizer = A.Resize(self.H, self.W, interpolation=cv2.INTER_CUBIC, p=1)

@@ -12,7 +12,7 @@ training:
   template: experiments/original/clas/training-template.yml
 
 data_loader:
-  type: CloudClasTestDataLoader
+  type: CloudTestDataLoader
   args:
     batch_size: 16
     data_dir: data/raw/

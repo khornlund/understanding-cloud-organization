@@ -12,7 +12,7 @@ training:
   template: experiments/pseudo/seg/training-template.yml
 
 data_loader:
-  type: CloudSegPseudoTestDataLoader
+  type: CloudPseudoTestDataLoader
   args:
     batch_size: 16
     data_dir: data/raw/

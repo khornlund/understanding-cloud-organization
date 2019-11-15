@@ -116,7 +116,7 @@ def predict(config_filename, model_checkpoint):
 )
 def predict_all(folder, config_filename):
     config = load_config(config_filename)
-    checkpoints = sorted(list(Path(folder).glob("1113*/checkpoints/model_best.pth")))
+    checkpoints = sorted(list(Path(folder).glob("**/model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
     for checkpoint in checkpoints:
         try:

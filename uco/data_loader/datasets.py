@@ -36,7 +36,7 @@ class CloudDatasetBase(Dataset):
         return len(self.fnames)
 
 
-class CloudDatasetTrainVal(CloudDatasetBase):
+class CloudSegDatasetTrainVal(CloudDatasetBase):
 
     img_folder = "train_images"
 
@@ -87,21 +87,6 @@ class CloudClasDatasetTrainVal(CloudDatasetBase):
             [mask[:, :, c].sum() > 0 for c in range(4)], dtype=np.float32
         )
         return img, targets
-
-
-class CloudClasDatasetTest(CloudDatasetBase):
-
-    img_folder = "test_images"
-
-    def __init__(self, df, data_dir, transforms):
-        super().__init__(df, data_dir, transforms)
-        self.transforms = transforms
-
-    def __getitem__(self, idx):
-        f, img = self.read_rgb(idx)
-        augmented = self.transforms(image=img)
-        img = augmented["image"]
-        return f, img
 
 
 class CloudDatasetPseudoTrain(CloudDatasetBase):

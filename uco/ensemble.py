@@ -344,7 +344,7 @@ class OptimizerOptionsClassification(ConfigOptionBase):
                         # "QHAdamW"
                     ]
                 ),
-                "lr": np.random.uniform(1e-4, 5e-4),
+                "lr": np.random.uniform(5e-5, 1e-4),
             }
         ]
 
@@ -399,44 +399,44 @@ class ModelOptionsClassification(ConfigOptionBase):
                         "args": {"height": 320, "width": 480},
                     },
                 },
-                # {
-                #     "type": "TIMM",
-                #     "args": {
-                #         "encoder_name": str(
-                #             np.random.choice(
-                #                 [
-                #                     "resnext50d_32x4d",
-                #                     "tv_resnext50_32x4d",
-                #                     "ssl_resnext50_32x4d",
-                #                 ]
-                #             )
-                #         )
-                #     },
-                #     "batch_size": 20,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # },
-                # {
-                #     "type": "TIMM",
-                #     "args": {
-                #         "encoder_name": str(
-                #             np.random.choice(
-                #                 [
-                #                     "resnext50d_32x4d",
-                #                     "tv_resnext50_32x4d",
-                #                     "ssl_resnext50_32x4d",
-                #                 ]
-                #             )
-                #         )
-                #     },
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 384, "width": 576},
-                #     },
-                # },
+                {
+                    "type": "TIMM",
+                    "args": {
+                        "encoder_name": str(
+                            np.random.choice(
+                                [
+                                    "resnext50d_32x4d",
+                                    "tv_resnext50_32x4d",
+                                    "ssl_resnext50_32x4d",
+                                ]
+                            )
+                        )
+                    },
+                    "batch_size": 20,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 320, "width": 480},
+                    },
+                },
+                {
+                    "type": "TIMM",
+                    "args": {
+                        "encoder_name": str(
+                            np.random.choice(
+                                [
+                                    "resnext50d_32x4d",
+                                    "tv_resnext50_32x4d",
+                                    "ssl_resnext50_32x4d",
+                                ]
+                            )
+                        )
+                    },
+                    "batch_size": 16,
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 384, "width": 576},
+                    },
+                },
             ]
             if GPU == 11
             else []
