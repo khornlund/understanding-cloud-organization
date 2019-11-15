@@ -27,5 +27,6 @@ output:
   N: 4211
   raw: data/pseudo/raw-seg-predictions.h5
   avg: data/pseudo/avg-seg-predictions.h5
+  img: data/raw/gibs.csv
   sub: data/pseudo/submission.csv
   log: data/pseudo/log.csv
