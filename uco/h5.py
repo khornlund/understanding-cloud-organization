@@ -173,7 +173,6 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
                 pred_stack = np.stack([h5[k][n, :, :, :] for k in group_keys], axis=0)
                 pred_stack = pred_stack * weights
                 pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
-                # TODO: std calculation?
                 dset[n, :, :, :] = pred_avg
         self.logger.info(f"Finished averaging all.")
 
@@ -192,10 +191,13 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
             "efficientnet-b6-FPN": 0.1,
             "resnext101_32x8d-FPN": 3.0,  # 0.6718
             "resnext101_32x8d-Unet": 1.5,  # 0.6670
+            "se_resnet101-FPN": 0.1,
+            "se_resnext101_32x4d-FPN": 0.1,
             "inceptionresnetv2-Unet": 0.1,
             "inceptionv4-FPN": 0.5,
             "deeplabv3_resnet101-DeepLabV3": 1.5,  # 0.6651
-            "dpn131-FPN": 3.0,
+            "dpn131-FPN": 3.0,  # 0.6687
+            "densenet161": 2.0,
         }
         w = weights.get(name, 0)
         self.logger.info(f"Using weight {w} for {name}")
@@ -223,7 +225,6 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
                     )
                     pred_stack = pred_stack * weights / 100  # undo scaling
                     pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
-                    # TODO: std calculation?
                     dset[n, :] = pred_avg
         self.logger.info(f"Finished averaging model groups.")
 
@@ -235,22 +236,34 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
             self.logger.info(f"Averaging {group_keys}")
 
             dset = h5.create_dataset(
-                self.dataset_name, (self.N, self.C), dtype="float32"
+                self.dataset_name,
+                (self.N, self.C),
+                dtype="float32"
+                if self.dataset_name not in h5.keys()
+                else h5[self.dataset_name],
             )
 
             for n in tqdm(range(self.N), total=self.N):
                 pred_stack = np.stack([h5[k][n, :] for k in group_keys], axis=0)
                 pred_stack = pred_stack * weights
                 pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
-                # TODO: std calculation?
                 dset[n, :] = pred_avg
         self.logger.info(f"Finished averaging all.")
 
     def get_weight_model(self, score):
-        return 1
+        return 0.55 - score
 
-    def get_weight_group(self, group_name):
-        return 1
+    def get_weight_group(self, name):
+        weights = {
+            "efficientnet-b0-EfficientNet": 1.0,
+            "efficientnet-b2-EfficientNet": 1.0,
+            "efficientnet-b4-EfficientNet": 1.0,
+            "tv_resnext50_32x4d-TIMM": 0.50,
+            "resnext50_32x4d-TIMM": 0.50,
+        }
+        w = weights.get(name, 0)
+        self.logger.info(f"Using weight {w} for {name}")
+        return w
 
 
 # -- Post Processing ------------------------------------------------------------------
@@ -261,7 +274,7 @@ class PostProcessor(HDF5ReaderWriterBase):
     sample_csv = "sample_submission.csv"
     t0 = np.array([9573, 9670, 9019, 7885]) / 5
     c_factor = 9
-    top_thresholds = np.array([0.56, 0.57, 0.555, 0.55])
+    top_thresholds = np.array([0.55, 0.55, 0.55, 0.55])
     bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, n_imgs, verbose=2):
@@ -278,7 +291,6 @@ class PostProcessor(HDF5ReaderWriterBase):
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
         sample_df = pd.read_csv(sample_submission)
 
-        throwaway_counter = np.array([0, 0, 0, 0])
         positive_counter = np.array([0, 0, 0, 0])
         dset_name = HDF5AverageWriterBase.dataset_name
 
@@ -288,14 +300,12 @@ class PostProcessor(HDF5ReaderWriterBase):
             for n in tqdm(range(self.N), total=self.N):
                 pred_seg = f_seg[dset_name][n, :, :, :]
                 pred_clas = f_clas[dset_name][n, :]
-                rles, throwaways = self.threshold(pred_seg, pred_clas)
-                throwaway_counter += throwaways
+                rles = self.threshold(pred_seg, pred_clas)
                 for c, rle in enumerate(rles):
                     if rle != "":
                         positive_counter[c] += 1
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
         sample_df.to_csv(submission_filename, index=False)
-        self.logger.info(f"Threw away {throwaway_counter} predictions under min size")
         self.logger.info(f"Positive predictions: {positive_counter}")
         self.logger.info(f'saved predictions to "{submission_filename}"')
 
@@ -303,23 +313,22 @@ class PostProcessor(HDF5ReaderWriterBase):
         """
         Post process predictions by applying triplet-threshold.
         """
-        throwaways = np.array([0, 0, 0, 0])
-
-        top_pass = (pred_seg > self.top_thresholds[:, np.newaxis, np.newaxis]).astype(
-            np.uint8
-        )
+        pred_seg_copy = pred_seg.copy()
+        top_pass = (
+            pred_seg_copy > self.top_thresholds[:, np.newaxis, np.newaxis]
+        ).astype(np.uint8)
 
         min_sizes = compute_threshold(self.t0, self.c_factor, pred_clas)
         for c in range(self.C):
             if top_pass[c, :, :].sum() < min_sizes[c]:
-                throwaways[c] += 1
-                pred_seg[c, :, :] = 0
+                pred_seg_copy[c, :, :] = 0
 
-        bot_pass = (pred_seg > self.bot_thresholds[:, np.newaxis, np.newaxis]).astype(
-            np.uint8
-        )
+        bot_pass = (
+            pred_seg_copy > self.bot_thresholds[:, np.newaxis, np.newaxis]
+        ).astype(np.uint8)
+
         rles = [str(RLEOutput.from_mask(bot_pass[c, :, :])) for c in range(self.C)]
-        return rles, throwaways
+        return rles
 
 
 def compute_threshold(t0, c_factor, classification_output):
@@ -336,6 +345,14 @@ def compute_threshold(t0, c_factor, classification_output):
         The output from a classifier in [0, 1]
     """
     return (t0 * c_factor) - (t0 * (c_factor - 1) * classification_output)
+
+
+def get_highest_class(pred_seg):
+    """
+    Compute sum of square predictions for each class and return the highest.
+    """
+    scores = [np.square(pred_seg[c, :, :]).sum() for c in range(4)]
+    return np.argmax(scores)
 
 
 def draw_convex_hull(mask, mode="convex"):
