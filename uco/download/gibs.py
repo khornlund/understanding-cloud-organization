@@ -66,13 +66,7 @@ class TimeGenerator:
     Generate dates in Y-m-d format for the valid months of a domain.
     """
 
-    valid_years = [
-        # 2002,
-        2003,
-        2004,
-        2005,
-        2018,
-    ]
+    valid_years = [2002, 2003, 2004, 2005, 2018]
 
     @classmethod
     def for_domain(cls, domain):

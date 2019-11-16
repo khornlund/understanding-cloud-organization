@@ -119,13 +119,13 @@ class LossOptionsSegmentation(ConfigOptionBase):
                 "args": {"bce_weight": bce_weight, "lovasz_weight": 1 - bce_weight},
             }
         )
-        bce_weight = np.random.uniform(0.65, 0.75)
-        opts.append(
-            {
-                "type": "BCEDiceLoss",
-                "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
-            }
-        )
+        # bce_weight = np.random.uniform(0.65, 0.75)
+        # opts.append(
+        #     {
+        #         "type": "BCEDiceLoss",
+        #         "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
+        #     }
+        # )
         return opts
 
     @classmethod
@@ -137,11 +137,22 @@ class LossOptionsSegmentation(ConfigOptionBase):
 class OptimizerOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
+        encoder_lr = np.random.uniform(5e-5, 7e-5)
+        decoder_lr = np.random.uniform(3e-3, 4e-3)
         return [
+            # {
+            #     "optim": "QHAdamW",
+            #     "args": {
+            #         "nus": (0.7, 1.0)
+            #     },
+            #     "encoder_lr": encoder_lr,
+            #     "decoder_lr": decoder_lr,
+            # },
             {
-                "optim": np.random.choice(["RAdam", "QHAdamW"]),
-                "encoder": np.random.uniform(5e-5, 9e-5),
-                "decoder": np.random.uniform(3e-3, 4e-3),
+                "optim": "RAdam",
+                "args": {},
+                "encoder_lr": encoder_lr,
+                "decoder_lr": decoder_lr,
             }
         ]
 
@@ -149,8 +160,9 @@ class OptimizerOptionsSegmentation(ConfigOptionBase):
     def update(cls, config):
         option = cls.select()
         config["optimizer"]["type"] = str(option["optim"])
-        config["optimizer"]["encoder"]["lr"] = float(option["encoder"])
-        config["optimizer"]["decoder"]["lr"] = float(option["decoder"])
+        config["optimizer"]["args"].update(**option["args"])
+        config["optimizer"]["encoder"]["lr"] = float(option["encoder_lr"])
+        config["optimizer"]["decoder"]["lr"] = float(option["decoder_lr"])
         return config
 
 
@@ -170,35 +182,35 @@ class ModelOptionsSegmentation(ConfigOptionBase):
         )
         return (
             [
-                # unet - efficientnet-b0
-                {
-                    "type": "Unet",
-                    "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
-                    "batch_size": 20,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                # unet - efficientnet-b2
-                {
-                    "type": "Unet",
-                    "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                    "batch_size": 24,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 256, "width": 384},
-                    },
-                },
-                {
-                    "type": "Unet",
-                    "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                    "batch_size": 16,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
+                # # unet - efficientnet-b0
+                # {
+                #     "type": "Unet",
+                #     "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                #     "batch_size": 20,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 320, "width": 480},
+                #     },
+                # },
+                # # unet - efficientnet-b2
+                # {
+                #     "type": "Unet",
+                #     "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                #     "batch_size": 24,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 256, "width": 384},
+                #     },
+                # },
+                # {
+                #     "type": "Unet",
+                #     "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
+                #     "batch_size": 16,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 320, "width": 480},
+                #     },
+                # },
                 # fpn - efficientnet-b2
                 {
                     "type": "FPN",
@@ -212,7 +224,7 @@ class ModelOptionsSegmentation(ConfigOptionBase):
                         "type": transforms,
                         "args": {"height": 320, "width": 480},
                     },
-                },
+                }
             ]
             if GPU == 11
             else [

@@ -193,7 +193,9 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
             "resnext101_32x8d-FPN": 3.0,  # 0.6718
             "resnext101_32x8d-Unet": 1.5,  # 0.6670
             "inceptionresnetv2-Unet": 0.1,
+            "inceptionv4-FPN": 0.5,
             "deeplabv3_resnet101-DeepLabV3": 1.5,  # 0.6651
+            "dpn131-FPN": 3.0,
         }
         w = weights.get(name, 0)
         self.logger.info(f"Using weight {w} for {name}")
