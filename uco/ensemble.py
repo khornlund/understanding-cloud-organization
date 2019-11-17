@@ -182,16 +182,16 @@ class ModelOptionsSegmentation(ConfigOptionBase):
         )
         return (
             [
-                # # unet - efficientnet-b0
-                # {
-                #     "type": "Unet",
-                #     "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
-                #     "batch_size": 20,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # },
+                {
+                    "type": "FPN",
+                    "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                    "batch_size": 16,
+                    "decoder_merge_policy": "cat",
+                    "augmentation": {
+                        "type": transforms,
+                        "args": {"height": 384, "width": 576},
+                    },
+                },
                 # # unet - efficientnet-b2
                 # {
                 #     "type": "Unet",
@@ -212,19 +212,19 @@ class ModelOptionsSegmentation(ConfigOptionBase):
                 #     },
                 # },
                 # fpn - efficientnet-b2
-                {
-                    "type": "FPN",
-                    "args": {
-                        "encoder_name": "efficientnet-b2",
-                        "dropout": dropout,
-                        "decoder_merge_policy": "cat",
-                    },
-                    "batch_size": 16,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                }
+                # {
+                #     "type": "FPN",
+                #     "args": {
+                #         "encoder_name": "efficientnet-b2",
+                #         "dropout": dropout,
+                #         "decoder_merge_policy": "cat",
+                #     },
+                #     "batch_size": 16,
+                #     "augmentation": {
+                #         "type": transforms,
+                #         "args": {"height": 320, "width": 480},
+                #     },
+                # }
             ]
             if GPU == 11
             else [

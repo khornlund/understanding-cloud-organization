@@ -20,6 +20,7 @@ class HDF5ReaderWriterBase:
     W = 525
     C = 4
     # N = 3698
+    SCALE = 250
 
 
 # -- Writing raw predictions ----------------------------------------------------------
@@ -80,7 +81,7 @@ class HDF5SegPredictionWriter(HDF5PredictionWriterBase):
         for n in range(data.shape[0]):
             for c in range(self.C):
                 resized_data[n, c, :, :] = self.resizer(image=data[n, c, :, :])["image"]
-        return np.round(resized_data * 100)
+        return np.round(resized_data * self.SCALE)
 
 
 class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
@@ -103,7 +104,7 @@ class HDF5ClasPredictionWriter(HDF5PredictionWriterBase):
         self.counter += rdata.shape[0]
 
     def wrangle_output(self, data):
-        return np.round(data * 100)
+        return np.round(data * self.SCALE)
 
 
 # -- Writing average predictions ------------------------------------------------------
@@ -147,7 +148,7 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
                     pred_stack = np.stack(
                         [src[g][k][n, :, :, :] for k in src[g].keys()], axis=0
                     )
-                    pred_stack = pred_stack * weights / 100  # undo scaling
+                    pred_stack = pred_stack * weights / self.SCALE  # undo scaling
                     pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
                     # TODO: std calculation?
                     dset[n, :, :, :] = pred_avg
@@ -177,27 +178,25 @@ class HDF5SegAverageWriterBase(HDF5AverageWriterBase):
         self.logger.info(f"Finished averaging all.")
 
     def get_weight_model(self, score):
-        weight = max(0, score - 0.60)
+        weight = max(0, score - 0.58)
         return weight
 
     def get_weight_group(self, name):
         weights = {
-            "efficientnet-b0-FPN": 1.0,  # 0.6674
-            "efficientnet-b0-Unet": 0.5,
-            "efficientnet-b2-FPN": 1.0,  # 0.6666
-            "efficientnet-b2-Unet": 1.0,  # 0.6694
+            "efficientnet-b0-FPN": 0.8,  # 0.6674
+            "efficientnet-b0-Unet": 0.8,
+            "efficientnet-b2-FPN": 1.2,  # 0.6666
+            "efficientnet-b2-Unet": 1.2,  # 0.6694
             "efficientnet-b5-FPN": 1.0,  # 0.6665
             "efficientnet-b5-Unet": 1.0,  # 0.6651
-            "efficientnet-b6-FPN": 0.1,
             "resnext101_32x8d-FPN": 3.0,  # 0.6718
             "resnext101_32x8d-Unet": 1.5,  # 0.6670
-            "se_resnet101-FPN": 0.1,
-            "se_resnext101_32x4d-FPN": 0.1,
-            "inceptionresnetv2-Unet": 0.1,
+            "se_resnet101-FPN": 0.2,
+            "se_resnext101_32x4d-FPN": 0.2,
             "inceptionv4-FPN": 0.5,
             "deeplabv3_resnet101-DeepLabV3": 1.5,  # 0.6651
             "dpn131-FPN": 3.0,  # 0.6687
-            "densenet161": 2.0,
+            "densenet161": 3.0,
         }
         w = weights.get(name, 0)
         self.logger.info(f"Using weight {w} for {name}")
@@ -223,7 +222,7 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
                     pred_stack = np.stack(
                         [src[g][k][n, :] for k in src[g].keys()], axis=0
                     )
-                    pred_stack = pred_stack * weights / 100  # undo scaling
+                    pred_stack = pred_stack * weights / self.SCALE  # undo scaling
                     pred_avg = np.sum(pred_stack, axis=0) / weights.sum()
                     dset[n, :] = pred_avg
         self.logger.info(f"Finished averaging model groups.")
@@ -251,7 +250,7 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
         self.logger.info(f"Finished averaging all.")
 
     def get_weight_model(self, score):
-        return 0.55 - score
+        return max(0, 0.55 - score)
 
     def get_weight_group(self, name):
         weights = {
@@ -259,7 +258,7 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
             "efficientnet-b2-EfficientNet": 1.0,
             "efficientnet-b4-EfficientNet": 1.0,
             "tv_resnext50_32x4d-TIMM": 0.50,
-            "resnext50_32x4d-TIMM": 0.50,
+            "resnext50d_32x4d-TIMM": 0.50,
         }
         w = weights.get(name, 0)
         self.logger.info(f"Using weight {w} for {name}")
@@ -272,9 +271,10 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
 class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
-    t0 = np.array([9573, 9670, 9019, 7885]) / 5
-    c_factor = 9
-    top_thresholds = np.array([0.55, 0.55, 0.55, 0.55])
+    # t0 = np.array([9573, 9670, 9019, 7885]) / 5
+    min_sizes = np.array([9573, 9670, 9019, 7885])
+    top_upper = np.array([0.57, 0.59, 0.57, 0.58])
+    top_lower = np.array([0.48, 0.50, 0.48, 0.49])
     bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, n_imgs, verbose=2):
@@ -285,9 +285,9 @@ class PostProcessor(HDF5ReaderWriterBase):
         self, seg_filename, clas_filename, sample_submission, submission_filename
     ):
         self.logger.info(f'PostProcessing: "{seg_filename}", "{clas_filename}"')
-        self.logger.info(f"t0: {self.t0}")
-        self.logger.info(f"c_factor: {self.c_factor}")
-        self.logger.info(f"top_thresholds: {self.top_thresholds}")
+        self.logger.info(f"min_sizes: {self.min_sizes}")
+        self.logger.info(f"top_upper: {self.top_upper}")
+        self.logger.info(f"top_lower: {self.top_lower}")
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
         sample_df = pd.read_csv(sample_submission)
 
@@ -313,25 +313,32 @@ class PostProcessor(HDF5ReaderWriterBase):
         """
         Post process predictions by applying triplet-threshold.
         """
-        pred_seg_copy = pred_seg.copy()
-        top_pass = (
-            pred_seg_copy > self.top_thresholds[:, np.newaxis, np.newaxis]
-        ).astype(np.uint8)
+        top_thresholds = compute_top_threshold(
+            self.top_lower, self.top_upper, pred_clas
+        )
 
-        min_sizes = compute_threshold(self.t0, self.c_factor, pred_clas)
+        top_pass = (pred_seg > top_thresholds[:, np.newaxis, np.newaxis]).astype(
+            np.uint8
+        )
+
         for c in range(self.C):
-            if top_pass[c, :, :].sum() < min_sizes[c]:
-                pred_seg_copy[c, :, :] = 0
+            if top_pass[c, :, :].sum() < self.min_sizes[c]:
+                pred_seg[c, :, :] = 0
 
-        bot_pass = (
-            pred_seg_copy > self.bot_thresholds[:, np.newaxis, np.newaxis]
-        ).astype(np.uint8)
+        bot_pass = (pred_seg > self.bot_thresholds[:, np.newaxis, np.newaxis]).astype(
+            np.uint8
+        )
 
         rles = [str(RLEOutput.from_mask(bot_pass[c, :, :])) for c in range(self.C)]
         return rles
 
 
-def compute_threshold(t0, c_factor, classification_output):
+def compute_top_threshold(tmin, tmax, classification_output):
+    trange = tmax - tmin
+    return tmax - trange * classification_output
+
+
+def compute_size_threshold(t0, c_factor, classification_output):
     """
     Adjust a threshold based on classification output.
 
