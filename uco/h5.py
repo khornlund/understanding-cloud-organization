@@ -252,9 +252,10 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
 class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
-    t0 = np.array([9573, 9670, 9019, 7885]) / 3
-    c_factor = 4
-    top_thresholds = np.array([0.55, 0.57, 0.55, 0.56])
+    t0 = np.array([9573, 9670, 9019, 7885]) / 2
+    c_factor = 0.80
+    # top_thresholds = np.array([0.55, 0.57, 0.55, 0.56])
+    top_thresholds = np.array([0.52, 0.52, 0.52, 0.52])
     bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, n_imgs, verbose=2):
@@ -270,6 +271,9 @@ class PostProcessor(HDF5ReaderWriterBase):
         self.logger.info(f"top_thresholds: {self.top_thresholds}")
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
         sample_df = pd.read_csv(sample_submission)
+
+        self.low_pass = 0
+        self.high_block = 0
 
         positive_counter = np.array([0, 0, 0, 0])
         dset_name = HDF5AverageWriterBase.dataset_name
@@ -287,6 +291,8 @@ class PostProcessor(HDF5ReaderWriterBase):
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
         sample_df.to_csv(submission_filename, index=False)
         self.logger.info(f"Positive predictions: {positive_counter}")
+        self.logger.info(f"High block: {self.high_block}")
+        self.logger.info(f"Low pass: {self.low_pass}")
         self.logger.info(f'saved predictions to "{submission_filename}"')
 
     def threshold(self, pred_seg, pred_clas):
@@ -298,8 +304,15 @@ class PostProcessor(HDF5ReaderWriterBase):
         )
 
         min_sizes = compute_size_threshold(self.t0, self.c_factor, pred_clas)
+        top_sizes = compute_size_threshold(self.t0, self.c_factor, np.repeat(0, 4))
+        bot_sizes = compute_size_threshold(self.t0, self.c_factor, np.repeat(1, 4))
         for c in range(self.C):
-            if top_pass[c, :, :].sum() < min_sizes[c]:
+            count = top_pass[c, :, :].sum()
+            if self.t0[c] < count and count < top_sizes[c]:
+                self.high_block += 1
+            if bot_sizes[c] < count and count < self.t0[c]:
+                self.low_pass += 1
+            if count < min_sizes[c]:
                 pred_seg[c, :, :] = 0
 
         bot_pass = (pred_seg > self.bot_thresholds[:, np.newaxis, np.newaxis]).astype(
@@ -321,13 +334,13 @@ def compute_size_threshold(t0, c_factor, classification_output):
     Parameters
     ----------
     t0 : numeric
-        The original pixel threshold
-    c_factor : numeric
-        The amount a negative classification output will scale the pixel threshold.
+        The threshold when classifier output is 0.5
+    c_factor : numeric in range [0, 1]
+        t0 will be scaled up or down by this factor in proportion to classifier output
     classification_output : numeric
         The output from a classifier in [0, 1]
     """
-    return (t0 * c_factor) - (t0 * (c_factor - 1) * classification_output)
+    return t0 - t0 * 2 * c_factor * (classification_output - 0.5)
 
 
 def get_highest_class(pred_seg):

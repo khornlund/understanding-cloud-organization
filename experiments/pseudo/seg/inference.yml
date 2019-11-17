@@ -15,7 +15,7 @@ data_loader:
   #type: CloudPseudoTestDataLoader
   type: CloudTestDataLoader
   args:
-    batch_size: 16
+    batch_size: 8
     data_dir: data/raw/
     nworkers: 8
     pin_memory: true
@@ -30,7 +30,7 @@ group_weights:
   efficientnet-b5-FPN: 1.2
   resnext101_32x8d-FPN: 1.0
   dpn131-FPN: 1.0
-  densenet161: 1.0
+  densenet161-FPN: 1.0
 
 output:
   # N: 4211
