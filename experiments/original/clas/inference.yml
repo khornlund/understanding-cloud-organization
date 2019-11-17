@@ -23,6 +23,13 @@ tta: ClassificationTTAWrapper
 write: HDF5ClasPredictionWriter
 average: HDF5ClasAverageWriterBase
 
+group_weights:
+  efficientnet-b0-EfficientNet: 1.0
+  efficientnet-b2-EfficientNet: 1.0
+  efficientnet-b4-EfficientNet: 1.0
+  tv_resnext50_32x4d-TIMM: 0.50
+  resnext50d_32x4d-TIMM: 0.50
+
 output:
   N: 3698
   raw: data/original/raw-clas-predictions.h5

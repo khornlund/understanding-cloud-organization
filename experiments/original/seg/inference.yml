@@ -23,6 +23,22 @@ tta: SegmentationTTAWrapper
 write: HDF5SegPredictionWriter
 average: HDF5SegAverageWriterBase
 
+group_weights:
+  efficientnet-b0-FPN: 0.8            # 0.6674
+  efficientnet-b0-Unet: 0.8
+  efficientnet-b2-FPN: 1.2            # 0.6666
+  efficientnet-b2-Unet: 1.2           # 0.6694
+  efficientnet-b5-FPN: 1.0            # 0.6665
+  efficientnet-b5-Unet: 1.0           # 0.6651
+  resnext101_32x8d-FPN: 3.0           # 0.6718
+  resnext101_32x8d-Unet: 1.5          # 0.6670
+  se_resnet101-FPN: 0.2
+  se_resnext101_32x4d-FPN: 0.2
+  inceptionv4-FPN: 0.5
+  deeplabv3_resnet101-DeepLabV3: 1.5  # 0.6651
+  dpn131-FPN: 3.0                     # 0.6687
+  densenet161: 3.0
+
 output:
   N: 3698
   raw: data/original/raw-seg-predictions.h5

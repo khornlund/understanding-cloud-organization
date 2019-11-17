@@ -5,14 +5,15 @@ device: 1
 verbose: 2
 tensorboard: false
 run_inference: true
-score_threshold: 0.605
+score_threshold: 0.635
 
 training:
   randomiser: ConfigurationRandomiserSegmentation
   template: experiments/pseudo/seg/training-template.yml
 
 data_loader:
-  type: CloudPseudoTestDataLoader
+  #type: CloudPseudoTestDataLoader
+  type: CloudTestDataLoader
   args:
     batch_size: 16
     data_dir: data/raw/
@@ -23,10 +24,20 @@ tta: SegmentationTTAWrapper
 write: HDF5SegPredictionWriter
 average: HDF5SegAverageWriterBase
 
+group_weights:
+  efficientnet-b0-FPN: 1.0
+  efficientnet-b2-FPN: 1.0
+  efficientnet-b5-FPN: 1.2
+  resnext101_32x8d-FPN: 1.0
+  dpn131-FPN: 1.0
+  densenet161: 1.0
+
 output:
-  N: 4211
+  # N: 4211
+  N: 3698
   raw: data/pseudo/raw-seg-predictions.h5
   avg: data/pseudo/avg-seg-predictions.h5
-  img: data/raw/gibs.csv
+  # img: data/raw/gibs.csv
+  img: data/raw/sample_submission.csv
   sub: data/pseudo/submission.csv
   log: data/pseudo/log.csv

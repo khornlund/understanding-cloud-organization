@@ -118,7 +118,7 @@ def predict_all(folder, config_filename):
     config = load_config(config_filename)
     checkpoints = sorted(list(Path(folder).glob("**/model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
-    for checkpoint in checkpoints:
+    for checkpoint in checkpoints[:-1]:  # skip currently training
         try:
             InferenceManager(config).run(checkpoint)
         except Exception as ex:
@@ -137,7 +137,7 @@ def average(config_filename):
     setup_logging(config)
     getattr(h5, config["average"])(
         config["output"]["N"], verbose=config["verbose"]
-    ).average(config["output"]["raw"], config["output"]["avg"])
+    ).average(config["output"]["raw"], config["output"]["avg"], config["group_weights"])
 
 
 @cli.command()
