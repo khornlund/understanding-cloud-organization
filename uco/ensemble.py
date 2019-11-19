@@ -13,9 +13,6 @@ from uco.utils import (  # noqa
 )
 
 
-GPU = 11  # RTX 2080Ti
-
-
 class EnsembleManager:
     def __init__(self, infer_config):
         self.infer_config = infer_config
@@ -48,12 +45,12 @@ class EnsembleManager:
                     self.logger.info(f"Deleting {f}")
                     f.unlink()
 
-                # # Log details for run
-                # Indexer.index(checkpoint_dir.parent)
+                # Log details for run
+                Indexer.index(checkpoint_dir.parent)
 
-                # if self.run_inference:  # run inference using the best model
-                #     model_checkpoint = checkpoint_dir / "model_best.pth"
-                #     InferenceManager(self.infer_config).run(model_checkpoint)
+                if self.run_inference:  # run inference using the best model
+                    model_checkpoint = checkpoint_dir / "model_best.pth"
+                    InferenceManager(self.infer_config).run(model_checkpoint)
             except Exception as ex:
                 self.logger.critical(f"Caught exception: {ex}")
                 self.logger.critical(f"Model checkpoint: {model_checkpoint}")
@@ -119,13 +116,13 @@ class LossOptionsSegmentation(ConfigOptionBase):
                 "args": {"bce_weight": bce_weight, "lovasz_weight": 1 - bce_weight},
             }
         )
-        # bce_weight = np.random.uniform(0.65, 0.75)
-        # opts.append(
-        #     {
-        #         "type": "BCEDiceLoss",
-        #         "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
-        #     }
-        # )
+        bce_weight = np.random.uniform(0.65, 0.75)
+        opts.append(
+            {
+                "type": "BCEDiceLoss",
+                "args": {"bce_weight": bce_weight, "dice_weight": 1 - bce_weight},
+            }
+        )
         return opts
 
     @classmethod
@@ -137,23 +134,21 @@ class LossOptionsSegmentation(ConfigOptionBase):
 class OptimizerOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
-        encoder_lr = np.random.uniform(5e-5, 7e-5)
-        decoder_lr = np.random.uniform(3e-3, 4e-3)
+        encoder_lr = np.random.uniform(3e-5, 5e-5)
+        decoder_lr = np.random.uniform(2e-3, 3e-3)
         return [
-            # {
-            #     "optim": "QHAdamW",
-            #     "args": {
-            #         "nus": (0.7, 1.0)
-            #     },
-            #     "encoder_lr": encoder_lr,
-            #     "decoder_lr": decoder_lr,
-            # },
+            {
+                "optim": "QHAdamW",
+                "args": {"nus": (0.7, 1.0)},
+                "encoder_lr": encoder_lr,
+                "decoder_lr": decoder_lr,
+            },
             {
                 "optim": "RAdam",
                 "args": {},
                 "encoder_lr": encoder_lr,
                 "decoder_lr": decoder_lr,
-            }
+            },
         ]
 
     @classmethod
@@ -180,138 +175,19 @@ class ModelOptionsSegmentation(ConfigOptionBase):
                 ]
             )
         )
-        return (
-            [
-                {
-                    "type": "FPN",
-                    "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
-                    "batch_size": 16,
-                    "decoder_merge_policy": "cat",
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 384, "width": 576},
-                    },
+        return [
+            {
+                "type": "FPN",
+                "args": {"encoder_name": "efficientnet-b0", "dropout": dropout},
+                "batch_size": 12,
+                "decoder_merge_policy": "cat",
+                "augmentation": {
+                    "type": transforms,
+                    "args": {"height": 448, "width": 672},
                 },
-                # # unet - efficientnet-b2
-                # {
-                #     "type": "Unet",
-                #     "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                #     "batch_size": 24,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 256, "width": 384},
-                #     },
-                # },
-                # {
-                #     "type": "Unet",
-                #     "args": {"encoder_name": "efficientnet-b2", "dropout": dropout},
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # },
-                # fpn - efficientnet-b2
-                # {
-                #     "type": "FPN",
-                #     "args": {
-                #         "encoder_name": "efficientnet-b2",
-                #         "dropout": dropout,
-                #         "decoder_merge_policy": "cat",
-                #     },
-                #     "batch_size": 16,
-                #     "augmentation": {
-                #         "type": transforms,
-                #         "args": {"height": 320, "width": 480},
-                #     },
-                # }
-            ]
-            if GPU == 11
-            else [
-                # unet - efficientnet-b5
-                {
-                    "type": "Unet",
-                    "args": {
-                        "encoder_name": "efficientnet-b5",
-                        # "dropout": dropout
-                    },
-                    "batch_size": 10,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                # unet - resnext101_32x8d
-                {
-                    "type": "Unet",
-                    "args": {
-                        "encoder_name": "resnext101_32x8d",
-                        # "dropout": dropout
-                    },
-                    "batch_size": 12,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                {
-                    "type": "Unet",
-                    "args": {
-                        "encoder_name": "resnext101_32x8d",
-                        # "dropout": dropout,
-                        "encoder_weights": "instagram",
-                    },
-                    "batch_size": 12,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                # fpn - efficientnet-b5
-                {
-                    "type": "FPN",
-                    "args": {
-                        "encoder_name": "efficientnet-b5",
-                        "dropout": dropout,
-                        "decoder_merge_policy": "cat",
-                    },
-                    "batch_size": 12,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                # fpn - resnext101_32x8d
-                {
-                    "type": "FPN",
-                    "args": {
-                        "encoder_name": "resnext101_32x8d",
-                        "dropout": dropout,
-                        "decoder_merge_policy": "cat",
-                    },
-                    "batch_size": 14,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                {
-                    "type": "FPN",
-                    "args": {
-                        "encoder_name": "resnext101_32x8d",
-                        "dropout": dropout,
-                        "decoder_merge_policy": "cat",
-                        "encoder_weights": "instagram",
-                    },
-                    "batch_size": 14,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                # fpn - se_resnext101_32x4d
-            ]
-        )
+            },
+            # add other configs as desired
+        ]
 
     @classmethod
     def update(cls, config):
@@ -350,12 +226,7 @@ class OptimizerOptionsClassification(ConfigOptionBase):
     def options(cls):
         return [
             {
-                "optim": np.random.choice(
-                    [
-                        "RAdam",
-                        # "QHAdamW"
-                    ]
-                ),
+                "optim": np.random.choice(["RAdam", "QHAdamW"]),
                 "lr": np.random.uniform(5e-5, 1e-4),
             }
         ]
@@ -371,7 +242,6 @@ class OptimizerOptionsClassification(ConfigOptionBase):
 class ModelOptionsClassification(ConfigOptionBase):
     @classmethod
     def options(cls):
-        # dropout = float(np.random.uniform(0.10, 0.20))
         transforms = str(
             np.random.choice(
                 [
@@ -382,77 +252,18 @@ class ModelOptionsClassification(ConfigOptionBase):
                 ]
             )
         )
-        return (
-            [
-                {
-                    "type": "EfficientNet",
-                    "args": {"encoder_name": "efficientnet-b0"},
-                    "batch_size": 16,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 448, "width": 672},
-                    },
+        return [
+            {
+                "type": "EfficientNet",
+                "args": {"encoder_name": "efficientnet-b2"},
+                "batch_size": 16,
+                "augmentation": {
+                    "type": transforms,
+                    "args": {"height": 384, "width": 576},
                 },
-                {
-                    "type": "EfficientNet",
-                    "args": {"encoder_name": "efficientnet-b2"},
-                    "batch_size": 16,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 384, "width": 576},
-                    },
-                },
-                {
-                    "type": "EfficientNet",
-                    "args": {"encoder_name": "efficientnet-b4"},
-                    "batch_size": 12,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                {
-                    "type": "TIMM",
-                    "args": {
-                        "encoder_name": str(
-                            np.random.choice(
-                                [
-                                    "resnext50d_32x4d",
-                                    "tv_resnext50_32x4d",
-                                    "ssl_resnext50_32x4d",
-                                ]
-                            )
-                        )
-                    },
-                    "batch_size": 20,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 320, "width": 480},
-                    },
-                },
-                {
-                    "type": "TIMM",
-                    "args": {
-                        "encoder_name": str(
-                            np.random.choice(
-                                [
-                                    "resnext50d_32x4d",
-                                    "tv_resnext50_32x4d",
-                                    "ssl_resnext50_32x4d",
-                                ]
-                            )
-                        )
-                    },
-                    "batch_size": 16,
-                    "augmentation": {
-                        "type": transforms,
-                        "args": {"height": 384, "width": 576},
-                    },
-                },
-            ]
-            if GPU == 11
-            else []
-        )
+            },
+            # add other configs as desired
+        ]
 
     @classmethod
     def update(cls, config):

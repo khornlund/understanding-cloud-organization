@@ -7,47 +7,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from .scheduler import rolloff
 
-
-class UpdatableLoss(nn.Module):
-    def set_epoch(self, epoch):
-        pass
-
-
-class BCELoss(UpdatableLoss):
+class BCELoss(nn.Module):
     def forward(self, outputs, targets):
         return {"loss": F.binary_cross_entropy_with_logits(outputs, targets)}
 
 
-class AnnealingLoss(UpdatableLoss):
-    def __init__(self, start_weight, end_weight, start_anneal, anneal_epochs):
-        super().__init__()
-        self.start_weight = start_weight
-        self.end_weight = end_weight
-        self.start_anneal = start_anneal
-        self.anneal_epochs = anneal_epochs
-        self.curve = self.get_curve(start_weight, end_weight, anneal_epochs)
-
-    def get_curve(self, start_weight, end_weight, anneal_epochs):
-        curve = rolloff(
-            anneal_epochs,
-            loc_factor=0.5,
-            scale_factor=0.1,
-            magnitude=start_weight - end_weight,
-            offset=end_weight,
-        )
-        return curve
-
-    def get_weight_for_epoch(self, epoch):
-        if epoch < self.start_anneal:
-            return self.start_weight
-        if epoch < self.start_anneal + self.anneal_epochs:
-            return self.start_weight * self.curve[epoch - self.start_anneal]
-        return self.end_weight
-
-
-class DiceLoss(UpdatableLoss):
+class DiceLoss(nn.Module):
     def __init__(self, eps: float = 1e-7, threshold: float = None, soften: float = 0):
         super().__init__()
         self.loss_fn = partial(dice, eps=eps, threshold=threshold, soften=soften)
@@ -57,7 +23,7 @@ class DiceLoss(UpdatableLoss):
         return 1 - dice
 
 
-class BCEDiceLoss(UpdatableLoss):
+class BCEDiceLoss(nn.Module):
     def __init__(
         self,
         eps: float = 1e-7,
@@ -95,7 +61,7 @@ class BCEDiceLoss(UpdatableLoss):
         return {"loss": loss, "bce": bce, "dice": dice}
 
 
-class BCELovaszLoss(UpdatableLoss):
+class BCELovaszLoss(nn.Module):
     def __init__(
         self,
         bce_weight: float = 0.5,
@@ -132,45 +98,7 @@ class BCELovaszLoss(UpdatableLoss):
         return {"loss": loss, "bce": bce, "lovasz": lovasz}
 
 
-class AnnealingBCELovaszLoss(AnnealingLoss):
-    """
-    Mixed loss than decays the weight of BCE as training progresses.
-    """
-
-    def __init__(
-        self,
-        bce_weight: float = 0.5,
-        lovasz_weight: float = 0.5,
-        per_image: bool = True,
-        end_weight: float = 0.5,
-        start_anneal: int = 0,
-        anneal_epochs: int = 0,
-    ):
-        super().__init__(bce_weight, end_weight, start_anneal, anneal_epochs)
-        self.bce_weight = bce_weight
-        self.lovasz_weight = lovasz_weight
-        if self.bce_weight != 0:
-            self.bce_loss = nn.BCEWithLogitsLoss()
-        if self.lovasz_weight != 0:
-            self.lovasz_loss = LovaszLoss(per_image=per_image)
-
-    def set_epoch(self, epoch):
-        self.bce_weight = self.get_weight_for_epoch(epoch)
-        self.lovasz_weight = 1 - self.bce_weight
-
-    def forward(self, outputs, targets):
-        if self.bce_weight == 0:
-            return self.dice_weight * self.lovasz_loss(outputs, targets)
-        if self.lovasz_weight == 0:
-            return self.bce_weight * self.bce_loss(outputs, targets)
-
-        bce = self.bce_loss(outputs, targets)
-        lovasz = self.lovasz_loss(outputs, targets)
-        loss = self.bce_weight * bce + self.lovasz_weight * lovasz
-        return {"loss": loss, "bce": bce, "lovasz": lovasz}
-
-
-class IoULoss(UpdatableLoss):
+class IoULoss(nn.Module):
     """
     Intersection over union (Jaccard) loss
     Args:
@@ -334,20 +262,6 @@ def flatten_binary_scores(scores, labels, ignore=None):
 
 
 # -- utils ----------------------------------------------------------------------------
-
-
-class LabelSmoother:
-    """
-    Maps binary labels (0, 1) to (eps, 1 - eps)
-    """
-
-    def __init__(self, eps=1e-8):
-        self.eps = eps
-        self.scale = 1 - 2 * self.eps
-        self.bias = self.eps / self.scale
-
-    def __call__(self, t):
-        return (t + self.bias) * self.scale
 
 
 def dice(

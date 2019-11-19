@@ -1,10 +1,36 @@
-================================
-understanding-cloud-organization
-================================
-PyTorch deep learning project made easy.
+========================================================================================================
+`understanding-cloud-organization <https://www.kaggle.com/c/understanding_cloud_organization/overview>`_
+========================================================================================================
+*Shallow clouds play a huge role in determining the Earth's climate.
+They’re also difficult to understand and to represent in climate models.
+By classifying different types of cloud organization, researchers at Max Planck hope
+to improve our physical understanding of these clouds, which in turn will help us build
+better climate models.*
 
 .. contents:: Table of Contents
-   :depth: 2
+   :depth: 3
+
+Competition Report
+==================
+
+Results
+-------
++------+---------+------------+
+| Rank |  Score  | Percentile |
++======+=========+============+
+|  34  | 0.66385 |  Top 2.2%  |
++------+---------+------------+
+
+Models
+------
+I used `segmentation_models.pytorch <https://github.com/qubvel/segmentation_models.pytorch>`_
+(SMP) as a framework, and
+`pytorch-image-models <https://github.com/rwightman/pytorch-image-models>`_ (TIIM).
+
+I used an ensemble of models for my submissions, covered below.
+
+
+
 
 Folder Structure
 ================

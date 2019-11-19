@@ -30,7 +30,7 @@ loss:
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    n_epochs: 26
+    n_epochs: 36
     start_anneal: 1
 
 metrics:
@@ -54,7 +54,7 @@ optimizer:
 
 training:
   early_stop: 8
-  epochs: 25
+  epochs: 35
   monitor: max val_dice_mean
   save_period: 1
   start_val_epoch: 1

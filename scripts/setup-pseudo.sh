@@ -1,4 +1,4 @@
-./gdown.pl 'https://drive.google.com/open?id=1jPU9KKIo-QeinhmGPEq6J45Pqiht1rdp' ['data/raw/pseudo.csv']
+./scripts/gdown.pl 'https://drive.google.com/open?id=1jPU9KKIo-QeinhmGPEq6J45Pqiht1rdp' 'data/raw/pseudo.csv'
 
 cd ~/bb/understanding-cloud-organization/data/raw
 mkdir joined_images/

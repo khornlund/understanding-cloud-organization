@@ -118,7 +118,7 @@ def predict_all(folder, config_filename):
     config = load_config(config_filename)
     checkpoints = sorted(list(Path(folder).glob("**/model_best.pth")))
     print(f"Performing predictions for {checkpoints}")
-    for checkpoint in checkpoints[:-1]:  # skip currently training
+    for checkpoint in checkpoints:
         try:
             InferenceManager(config).run(checkpoint)
         except Exception as ex:
@@ -162,6 +162,21 @@ def post_process(seg_config_filename, clas_config_filename):
         clas_config["output"]["avg"],
         seg_config["output"]["img"],
         seg_config["output"]["sub"],
+    )
+
+
+@cli.command()
+@click.option(
+    "-c",
+    "--config-filename",
+    default=DEFAULT_SEG_INFERENCE,
+    help="Path to segmentation inference configuration file.",
+)
+def analyse(config_filename):
+    seg_config = load_config(config_filename)
+    setup_logging(seg_config)
+    h5.HDF5SegAnalyser(seg_config["output"]["N"], verbose=2).analyse(
+        seg_config["output"]["avg"], seg_config["output"]["ana"]
     )
 
 

@@ -5,9 +5,10 @@ import albumentations as A
 from albumentations.augmentations import functional as F
 from albumentations.pytorch import ToTensorV2
 
-from .process import IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH  # noqa
+from .process import IMAGE_ORIGINAL_HEIGHT, IMAGE_ORIGINAL_WIDTH
 
 
+# image sizes divisible by 32 with same ratio as 1400x2100
 VALID_IMG_SIZES = [
     (64, 96),
     (128, 192),
@@ -160,9 +161,6 @@ def DistortionBase():
 
 
 class LightTransforms(RandomResizeCropBase):
-    """
-    """
-
     def build_train(self):
         return A.Compose(
             [
@@ -177,9 +175,6 @@ class LightTransforms(RandomResizeCropBase):
 
 
 class CutoutTransforms(RandomResizeCropBase):
-    """
-    """
-
     def build_train(self):
         return A.Compose(
             [
@@ -195,9 +190,6 @@ class CutoutTransforms(RandomResizeCropBase):
 
 
 class DistortionTransforms(RandomResizeCropBase):
-    """
-    """
-
     def build_train(self):
         return A.Compose(
             [
@@ -213,9 +205,6 @@ class DistortionTransforms(RandomResizeCropBase):
 
 
 class CutoutDistortionTransforms(RandomResizeCropBase):
-    """
-    """
-
     def build_train(self):
         return A.Compose(
             [

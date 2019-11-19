@@ -15,7 +15,7 @@ data_loader:
   #type: CloudPseudoTestDataLoader
   type: CloudTestDataLoader
   args:
-    batch_size: 8
+    batch_size: 4
     data_dir: data/raw/
     nworkers: 8
     pin_memory: true
@@ -27,8 +27,13 @@ average: HDF5SegAverageWriterBase
 group_weights:
   efficientnet-b0-FPN: 1.0
   efficientnet-b2-FPN: 1.0
+  efficientnet-b4-FPN: 0.7
   efficientnet-b5-FPN: 1.2
+  efficientnet-b6-FPN: 1.0
+  inceptionresnetv2-FPN: 1.5
+  inceptionv4-FPN: 1.2
   resnext101_32x8d-FPN: 1.0
+  se_resnext50_32x4d-FPN: 1.0
   dpn131-FPN: 1.0
   densenet161-FPN: 1.0
 
@@ -37,7 +42,8 @@ output:
   N: 3698
   raw: data/pseudo/raw-seg-predictions.h5
   avg: data/pseudo/avg-seg-predictions.h5
+  ana: data/pseudo/analysis-seg-predictions.h5
   # img: data/raw/gibs.csv
   img: data/raw/sample_submission.csv
-  sub: data/pseudo/submission.csv
+  sub: data/original/submission.csv
   log: data/pseudo/log.csv

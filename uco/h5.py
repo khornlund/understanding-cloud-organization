@@ -9,6 +9,7 @@ import albumentations as A
 
 from uco.data_loader import RLEOutput
 from uco.utils import setup_logger
+from numba import njit
 
 
 ORIGINAL_DIST = [0.50, 0.43, 0.53, 0.68]
@@ -126,7 +127,7 @@ class HDF5AverageWriterBase(HDF5ReaderWriterBase):
 
     def average(self, pred_filename, avg_filename, group_weights):
         self.logger.info(f'Reducing: "{pred_filename}" to "{avg_filename}"')
-        self.average_groups(pred_filename, avg_filename)
+        # self.average_groups(pred_filename, avg_filename)
         self.average_all(avg_filename, group_weights)
 
 
@@ -218,7 +219,8 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
     def average_all(self, avg_filename, group_weights):
         with h5py.File(avg_filename, "a") as h5:
             group_keys = [k for k in h5.keys() if k != self.dataset_name]
-            weights = self.setup_group_weights(group_weights, group_keys)
+            weights = [1 for _ in range(len(group_keys))]
+            # weights = self.setup_group_weights(group_weights, group_keys)
 
             dset = h5.create_dataset(
                 self.dataset_name,
@@ -249,13 +251,51 @@ class HDF5ClasAverageWriterBase(HDF5AverageWriterBase):
 # -- Post Processing ------------------------------------------------------------------
 
 
+class HDF5SegAnalyser(HDF5ReaderWriterBase):
+
+    top_thresholds = [1, 4000, 10000]
+
+    def __init__(self, n_imgs, verbose=2):
+        self.N = n_imgs
+        self.logger = setup_logger(self, verbose)
+
+    def analyse(self, avg_filename, ana_filename):
+        with h5py.File(avg_filename, "r") as src, h5py.File(ana_filename, "w") as dst:
+            src_key = HDF5AverageWriterBase.dataset_name
+            datasets = self.get_dst_datasets(dst)
+
+            self.logger.info(
+                f'Writing {self.top_thresholds}th values from "{avg_filename}" to '
+                f'"{ana_filename}"'
+            )
+
+            for n in tqdm(range(self.N), total=self.N):
+                preds = src[src_key][n, :, :, :]
+                for c in range(self.C):
+                    preds_c = preds[c, :, :]
+                    sorted_ = sort_flat(preds_c)
+                    for (th, dset) in datasets:
+                        dset[n, c] = sorted_[-th]
+
+    def get_dst_datasets(self, dst):
+        items = []
+        for th in self.top_thresholds:
+            name = f"top_{th}"
+            dset = dst.create_dataset(
+                name,
+                (self.N, self.C),
+                dtype="float32" if name not in dst.keys() else dst[name],
+            )
+            items.append((th, dset))
+        return items
+
+
 class PostProcessor(HDF5ReaderWriterBase):
 
     sample_csv = "sample_submission.csv"
-    t0 = np.array([9573, 9670, 9019, 7885]) / 2
-    c_factor = 0.80
-    # top_thresholds = np.array([0.55, 0.57, 0.55, 0.56])
-    top_thresholds = np.array([0.52, 0.52, 0.52, 0.52])
+    t0 = np.array([5000, 5000, 5000, 5000])
+    c_factor = np.array([0.03, 0.03, 0.03, 0.03])
+    top_thresholds = np.array([0.57, 0.57, 0.57, 0.57])
     bot_thresholds = np.array([0.40, 0.40, 0.40, 0.40])
 
     def __init__(self, n_imgs, verbose=2):
@@ -271,9 +311,6 @@ class PostProcessor(HDF5ReaderWriterBase):
         self.logger.info(f"top_thresholds: {self.top_thresholds}")
         self.logger.info(f"bot_thresholds: {self.bot_thresholds}")
         sample_df = pd.read_csv(sample_submission)
-
-        self.low_pass = 0
-        self.high_block = 0
 
         positive_counter = np.array([0, 0, 0, 0])
         dset_name = HDF5AverageWriterBase.dataset_name
@@ -291,28 +328,22 @@ class PostProcessor(HDF5ReaderWriterBase):
                     sample_df.iloc[4 * n + c]["EncodedPixels"] = rle
         sample_df.to_csv(submission_filename, index=False)
         self.logger.info(f"Positive predictions: {positive_counter}")
-        self.logger.info(f"High block: {self.high_block}")
-        self.logger.info(f"Low pass: {self.low_pass}")
         self.logger.info(f'saved predictions to "{submission_filename}"')
 
     def threshold(self, pred_seg, pred_clas):
         """
         Post process predictions by applying triplet-threshold.
         """
-        top_pass = (pred_seg > self.top_thresholds[:, np.newaxis, np.newaxis]).astype(
+        top_thresholds = compute_top_threshold(
+            self.top_thresholds, self.c_factor, pred_clas
+        )
+        top_pass = (pred_seg > top_thresholds[:, np.newaxis, np.newaxis]).astype(
             np.uint8
         )
 
-        min_sizes = compute_size_threshold(self.t0, self.c_factor, pred_clas)
-        top_sizes = compute_size_threshold(self.t0, self.c_factor, np.repeat(0, 4))
-        bot_sizes = compute_size_threshold(self.t0, self.c_factor, np.repeat(1, 4))
+        min_sizes = self.t0
         for c in range(self.C):
-            count = top_pass[c, :, :].sum()
-            if self.t0[c] < count and count < top_sizes[c]:
-                self.high_block += 1
-            if bot_sizes[c] < count and count < self.t0[c]:
-                self.low_pass += 1
-            if count < min_sizes[c]:
+            if top_pass[c, :, :].sum() < min_sizes[c]:
                 pred_seg[c, :, :] = 0
 
         bot_pass = (pred_seg > self.bot_thresholds[:, np.newaxis, np.newaxis]).astype(
@@ -322,9 +353,14 @@ class PostProcessor(HDF5ReaderWriterBase):
         return rles
 
 
-def compute_top_threshold(tmin, tmax, classification_output):
-    trange = tmax - tmin
-    return tmax - trange * classification_output
+@njit
+def sort_flat(a):
+    return np.sort(a.reshape(-1))
+
+
+def compute_top_threshold(t0, c_factor, classification_output):
+    delta = (classification_output - 0.5) * 2 * c_factor
+    return t0 - delta
 
 
 def compute_size_threshold(t0, c_factor, classification_output):

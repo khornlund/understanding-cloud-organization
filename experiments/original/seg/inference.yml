@@ -37,12 +37,14 @@ group_weights:
   inceptionv4-FPN: 0.5
   deeplabv3_resnet101-DeepLabV3: 1.5  # 0.6651
   dpn131-FPN: 3.0                     # 0.6687
-  densenet161: 3.0
+  densenet161-FPN: 3.0
+  pseudo: 40
 
 output:
   N: 3698
   raw: data/original/raw-seg-predictions.h5
   avg: data/original/avg-seg-predictions.h5
+  ana: data/original/analysis-seg-predictions.h5
   img: data/raw/sample_submission.csv
   sub: data/original/submission.csv
   log: data/original/log.csv

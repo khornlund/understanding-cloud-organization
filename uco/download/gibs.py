@@ -1,6 +1,10 @@
 """
 Downloads data from:
 https://wiki.earthdata.nasa.gov/display/GIBS/GIBS+API+for+Developers
+
+Domains, time period, and resolution have been chosen based on this paper documenting
+the training data:
+https://arxiv.org/abs/1906.01906
 """
 from pathlib import Path
 from dateutil.rrule import rrule, DAILY
