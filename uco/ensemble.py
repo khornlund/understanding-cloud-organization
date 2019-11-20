@@ -3,14 +3,8 @@ from copy import deepcopy
 
 import numpy as np
 
-from uco.runner import TrainingManager, InferenceManager  # noqa
-from uco.utils import (  # noqa
-    setup_logger,
-    setup_logging,
-    load_config,
-    seed_everything,
-    Indexer,
-)
+from uco.runner import TrainingManager, InferenceManager
+from uco.utils import setup_logger, setup_logging, load_config, seed_everything, Indexer
 
 
 class EnsembleManager:
@@ -134,8 +128,8 @@ class LossOptionsSegmentation(ConfigOptionBase):
 class OptimizerOptionsSegmentation(ConfigOptionBase):
     @classmethod
     def options(cls):
-        encoder_lr = np.random.uniform(3e-5, 5e-5)
-        decoder_lr = np.random.uniform(2e-3, 3e-3)
+        encoder_lr = np.random.uniform(5e-5, 9e-5)
+        decoder_lr = np.random.uniform(3e-3, 5e-3)
         return [
             {
                 "optim": "QHAdamW",
