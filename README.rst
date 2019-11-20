@@ -41,6 +41,9 @@ in serious metric differences. I figured I would give up on trying to fine tune
 individual models and instead focus on engineering a system that would allow me to
 train and ensemble *lots* of models.
 
+I developed functionality to allow me to automate the configuration, training, and
+inference of models.
+
 I trained an ensemble of ~120 models, using a variety of encoder/decoder combinations.
 I first averaged them together by their encoder/decoder combinations (eg. all the
 efficientnet-b2 FPN get averaged together). Then I averaged these mini-ensembles
@@ -97,8 +100,7 @@ that.
 
 The saved checkpoint would be loaded, and run inference on the test data. I saved out
 the *raw* (sigmoid) predictions of each model to HDF5. I scaled by 250 and rounded to
-integers so I could save as ``uint8`` to save disk space. The predictions of each model
-took around 2.5GB disk space.
+integers so I could save as ``uint8`` to save disk space.
 
 These raw predictions would be grouped by (encoder, decoder) pair, and averaged
 together weighted by mean dice scores. Then the groups would be averaged together,
@@ -117,12 +119,10 @@ I used `segmentation_models.pytorch <https://github.com/qubvel/segmentation_mode
 `pytorch-image-models <https://github.com/rwightman/pytorch-image-models>`_ (TIIM)
 for classification.
 
-I used an ensemble of models for my submissions, covered below.
-
 Encoders
 ********
 
-- efficientnet B0, B2, B5
+- efficientnet B0, B2, B5, B6
 - resnext 101_32x8d
 - se_resnext 101_32x8d
 - inceptionresnet v2, v4
@@ -145,9 +145,9 @@ RTX 2080Ti.
 
 Loss
 ****
-I used BCE + Dice with BCE weight = U(0.65, 0.75) and dice weight 1 - BCE.
+I used BCE + Dice with BCE weight ~U(0.65, 0.75) and dice weight 1 - BCE.
 
-I used BCE + Lovasz with BCE weight = U(0.83, 0.92) and lovasz 1 - BCE.
+I used BCE + Lovasz with BCE weight ~U(0.83, 0.92) and lovasz 1 - BCE.
 
 Learning Rate
 *************
