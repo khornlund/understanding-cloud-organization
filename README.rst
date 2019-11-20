@@ -151,8 +151,8 @@ I used BCE + Lovasz with BCE weight ~U(0.83, 0.92) and lovasz 1 - BCE.
 
 Learning Rate
 *************
-Encoder = U(5e-5, 9e-5)
-Decoder = U(3e-3, 5e-3)
+Encoder ~U(5e-5, 9e-5)
+Decoder ~U(3e-3, 5e-3)
 
 Optimizer
 *********
@@ -182,6 +182,20 @@ effects, so I used the following which maintained the original 1400:2100 aspect 
 Most models were trained using 320x480. I didn't notice any improvement using larger
 image sizes, but I figured it might help the ensemble to use diverse sizes.
 
+Pseudo Labels
+*************
+I used my ensemble trained on the official training data to predict masks for the ~4000
+images I downloaded. I then removed any images without masks, and trained on the rest.
+
+In contrast to some of the other people that used pseudo labels, I did not make my
+thresholds harsher for selecting pseudo labels. My rationale was that since most images
+included 2+ classes, increasing the thresholds to be 'safe' would likely mean missing
+the 2nd class in many images - leading to lots of false negative labels in my pseudo
+labels.
+
+I used a `balanced sampler <https://github.com/khornlund/pytorch-balanced-sampler>`_ to
+include 4 pseudo labelled samples per batch (typically batch sizes were 10-16).
+
 Post-Processing
 ~~~~~~~~~~~~~~~
 
@@ -210,7 +224,7 @@ interesting:
 
 .. image:: ./resources/average-prediction-distribution.png
 
-Classes 1 and 3 have a nicer bimodal distribution than classes 0 and 2.
+Class 1 has very nice bimodal distribution. This suggests it was the easiest to learn.
 
 
 Usage
